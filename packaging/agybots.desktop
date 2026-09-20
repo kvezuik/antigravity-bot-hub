@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Antigravity Bot Hub
+Comment=Grok-style AI Bot Studio & Runner for Antigravity
+Exec=agybots
+Icon=agybots
+Terminal=true
+Type=Application
+Categories=Development;Utility;
+Keywords=AI;Antigravity;Grok;Bot;CLI;

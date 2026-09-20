@@ -1,0 +1,23 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / Packaging
+build/
+dist/
+*.spec
+*.pyz
+
+# Local user history and data
+history/*.md
+!history/.gitkeep
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.bak
