@@ -8,8 +8,10 @@ __pycache__/
 # Distribution / Packaging
 build/
 dist/
+release-*/
 *.spec
 *.pyz
+AntigravityBotHub-Linux-x86_64.AppImage
 
 # Local user history and data
 history/*.md
