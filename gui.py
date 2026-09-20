@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Antigravity 2.0 • Grok Bot Studio - Desktop GUI Server & Launcher
-Provides modern, native-feeling desktop window powered by Antigravity core engine.
+Antigravity 2.0 - Desktop GUI Server & Launcher
+Provides modern, native-feeling desktop interface for Projects and Individual Chats.
 """
 
 import os
@@ -15,7 +15,7 @@ import threading
 import webbrowser
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
@@ -23,18 +23,8 @@ if BASE_DIR not in sys.path:
 
 WEB_DIR = os.path.join(BASE_DIR, "web")
 
-from bots import load_bots, get_bot, create_bot, update_bot, PRESET_BOTS
+import store
 from engine import ChatEngine, check_google_auth_and_subscription, find_agy_binary
-from exporter import export_to_antigravity_rule
-
-_ACTIVE_ENGINES: Dict[str, ChatEngine] = {}
-
-def get_chat_engine(bot_id: str) -> ChatEngine:
-    global _ACTIVE_ENGINES
-    if bot_id not in _ACTIVE_ENGINES:
-        bot = get_bot(bot_id) or PRESET_BOTS[0]
-        _ACTIVE_ENGINES[bot_id] = ChatEngine(bot)
-    return _ACTIVE_ENGINES[bot_id]
 
 
 class AntigravityGUIHandler(SimpleHTTPRequestHandler):
@@ -48,24 +38,57 @@ class AntigravityGUIHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
+        query = parse_qs(parsed.query)
 
         if path == "/api/status":
-            query = parse_qs(parsed.query)
             force_refresh = "refresh" in query
             status = check_google_auth_and_subscription(force_refresh=force_refresh)
             self._send_json(status)
             return
-        elif path == "/api/bots":
-            bots = load_bots()
-            self._send_json(bots)
+
+        elif path == "/api/projects":
+            projects = store.get_projects()
+            active_id = store.load_store().get("active_project_id")
+            self._send_json({"projects": projects, "active_id": active_id})
             return
-        elif path == "/api/export-chat":
-            query = parse_qs(parsed.query)
-            bot_id = query.get("bot_id", ["grok_fun"])[0]
-            engine = get_chat_engine(bot_id)
-            filepath = engine.save_session_markdown()
-            self._send_json({"ok": True, "path": filepath})
+
+        elif path == "/api/chats":
+            pid = query.get("project_id", [None])[0]
+            chats = store.get_chats(project_id=pid)
+            active_id = store.load_store().get("active_chat_id")
+            self._send_json({"chats": chats, "active_id": active_id})
             return
+
+        elif path == "/api/chats/messages":
+            chat_id = query.get("id", [None])[0]
+            if not chat_id:
+                chat_id = store.load_store().get("active_chat_id")
+            chat = store.get_chat(chat_id)
+            if chat:
+                self._send_json({
+                    "id": chat["id"],
+                    "name": chat["name"],
+                    "icon": chat["icon"],
+                    "model": chat.get("model", "gemini-3.8-flash-high"),
+                    "effort": chat.get("effort", "high"),
+                    "messages": chat.get("messages", [])
+                })
+            else:
+                self._send_json({"error": "not_found"}, status=404)
+            return
+
+        elif path == "/api/chats/export":
+            chat_id = query.get("id", [None])[0]
+            chat = store.get_chat(chat_id)
+            if chat:
+                engine = ChatEngine(chat_id=chat["id"])
+                engine.set_history(chat.get("messages", []))
+                filepath = engine.save_session_markdown(title=chat.get("name", "Диалог"))
+                self._send_json({"ok": True, "path": filepath})
+            else:
+                self._send_json({"error": "not_found"}, status=404)
+            return
+
         elif path == "/" or not os.path.exists(os.path.join(WEB_DIR, path.lstrip("/"))):
             self.path = "/index.html"
             return super().do_GET()
@@ -83,8 +106,97 @@ class AntigravityGUIHandler(SimpleHTTPRequestHandler):
         except Exception:
             data = {}
 
-        if path == "/api/chat":
-            bot_id = data.get("bot_id", "grok_fun")
+        # --- Projects ---
+        if path == "/api/projects":
+            name = data.get("name", "Новый проект")
+            icon = data.get("icon", "📁")
+            new_proj = store.create_project(name, icon)
+            self._send_json(new_proj)
+            return
+
+        elif path == "/api/projects/select":
+            pid = data.get("id")
+            if pid:
+                st = store.load_store()
+                st["active_project_id"] = pid
+                # Set active chat to first chat in this project
+                proj_chats = [c for c in st["chats"] if c.get("project_id") == pid]
+                if proj_chats:
+                    st["active_chat_id"] = proj_chats[0]["id"]
+                store.save_store(st)
+                self._send_json({"ok": True, "active_project_id": pid})
+            else:
+                self._send_json({"error": "missing_id"}, status=400)
+            return
+
+        elif path == "/api/projects/update":
+            pid = data.get("id")
+            name = data.get("name")
+            icon = data.get("icon")
+            updated = store.rename_project(pid, name, icon)
+            if updated:
+                self._send_json(updated)
+            else:
+                self._send_json({"error": "not_found"}, status=404)
+            return
+
+        elif path == "/api/projects/delete":
+            pid = data.get("id")
+            ok = store.delete_project(pid)
+            self._send_json({"ok": ok})
+            return
+
+        # --- Chats ---
+        elif path == "/api/chats":
+            pid = data.get("project_id") or store.load_store().get("active_project_id")
+            name = data.get("name", "Новый диалог")
+            icon = data.get("icon", "💬")
+            model = data.get("model", "gemini-3.8-flash-high")
+            new_chat = store.create_chat(pid, name, icon, model)
+            self._send_json(new_chat)
+            return
+
+        elif path == "/api/chats/select":
+            chat_id = data.get("id")
+            if chat_id:
+                st = store.load_store()
+                st["active_chat_id"] = chat_id
+                store.save_store(st)
+                self._send_json({"ok": True, "active_chat_id": chat_id})
+            else:
+                self._send_json({"error": "missing_id"}, status=400)
+            return
+
+        elif path == "/api/chats/update":
+            chat_id = data.get("id")
+            name = data.get("name")
+            icon = data.get("icon")
+            model = data.get("model")
+            effort = data.get("effort")
+            updated = store.update_chat(chat_id, name, icon, model, effort)
+            if updated:
+                self._send_json(updated)
+            else:
+                self._send_json({"error": "not_found"}, status=404)
+            return
+
+        elif path == "/api/chats/delete":
+            chat_id = data.get("id")
+            ok = store.delete_chat(chat_id)
+            self._send_json({"ok": ok})
+            return
+
+        elif path == "/api/chats/clear":
+            chat_id = data.get("id")
+            if chat_id:
+                store.clear_chat_history(chat_id)
+                self._send_json({"ok": True})
+            else:
+                self._send_json({"error": "missing_id"}, status=400)
+            return
+
+        elif path == "/api/chat":
+            chat_id = data.get("chat_id")
             user_msg = data.get("message", "").strip()
             model = data.get("model", "gemini-3.8-flash-high")
             effort = data.get("effort", "high")
@@ -93,46 +205,27 @@ class AntigravityGUIHandler(SimpleHTTPRequestHandler):
                 self._send_json({"error": "empty_message", "message": "Пустое сообщение"}, status=400)
                 return
 
-            engine = get_chat_engine(bot_id)
+            chat = store.get_chat(chat_id)
+            if not chat:
+                chat = store.get_chats()[0]
+                chat_id = chat["id"]
+
+            engine = ChatEngine(chat_id=chat_id)
+            engine.set_history(list(chat.get("messages", [])))
+
+            # Append user message to store and engine
+            engine.add_message("user", user_msg)
+
+            # Generate model response
             reply, thoughts = engine.generate_response(user_msg, model_override=model, effort_override=effort)
 
             self._send_json({
                 "reply": reply,
                 "thoughts": thoughts,
-                "bot_id": bot_id,
+                "chat_id": chat_id,
                 "model": model,
                 "effort": effort
             })
-            return
-
-        elif path == "/api/bots":
-            name = data.get("name", "Custom Bot")
-            emoji = data.get("emoji", "🤖")
-            tagline = data.get("tagline", "")
-            archetype = data.get("archetype", "grok_rebel")
-            humor = data.get("humor_level", 75)
-            prompt = data.get("system_prompt", "Ты полезный ассистент.")
-
-            bot_id = f"custom_{int(time.time())}"
-            new_bot = {
-                "id": bot_id,
-                "name": name,
-                "emoji": emoji,
-                "tagline": tagline,
-                "archetype": archetype,
-                "humor_level": humor,
-                "system_prompt": prompt,
-                "model": "gemini-3.8-flash-high"
-            }
-            create_bot(new_bot)
-            self._send_json(new_bot)
-            return
-
-        elif path == "/api/export-rules":
-            bot_id = data.get("bot_id", "grok_fun")
-            bot = get_bot(bot_id) or PRESET_BOTS[0]
-            rule_path = export_to_antigravity_rule(bot)
-            self._send_json({"ok": True, "path": rule_path})
             return
 
         self._send_json({"error": "not_found"}, status=404)
@@ -163,9 +256,8 @@ def find_free_port(preferred: int = 8990) -> int:
 
 def open_desktop_window(url: str) -> None:
     """Launch clean, dedicated application window without browser toolbar."""
-    temp_profile = "/tmp/antigravity_hub_profile"
+    temp_profile = "/tmp/antigravity_desktop_profile"
     
-    # Priority browser list for application window mode
     candidates = [
         "chromium",
         "google-chrome",
@@ -183,7 +275,7 @@ def open_desktop_window(url: str) -> None:
                 cmd = [
                     browser_bin,
                     f"--app={url}",
-                    "--class=AntigravityBotHub",
+                    "--class=AntigravityDesktop",
                     "--name=Antigravity 2.0",
                     f"--user-data-dir={temp_profile}",
                     "--no-first-run",
@@ -194,7 +286,6 @@ def open_desktop_window(url: str) -> None:
             except Exception:
                 pass
 
-    # Windows fallback
     if sys.platform == "win32":
         try:
             os.system(f'start msedge --app="{url}"')
@@ -202,7 +293,6 @@ def open_desktop_window(url: str) -> None:
         except Exception:
             pass
 
-    # Standard browser fallback
     webbrowser.open(url)
 
 
@@ -216,7 +306,7 @@ def start_gui(port: int = 0, open_window: bool = True) -> None:
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
 
-    print(f"🚀 Antigravity 2.0 Desktop Studio запущен на: {url}")
+    print(f"🚀 Antigravity 2.0 Desktop запущен на: {url}")
 
     if open_window:
         open_desktop_window(url)
@@ -230,4 +320,9 @@ def start_gui(port: int = 0, open_window: bool = True) -> None:
 
 
 if __name__ == "__main__":
-    start_gui()
+    import argparse
+    parser = argparse.ArgumentParser(description="Antigravity 2.0 Desktop Studio")
+    parser.add_argument("--port", type=int, default=0, help="Port to listen on")
+    parser.add_argument("--no-window", action="store_true", help="Do not open desktop window")
+    args = parser.parse_args()
+    start_gui(port=args.port, open_window=not args.no_window)

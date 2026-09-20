@@ -1,19 +1,23 @@
-// Antigravity 2.0 • Grok Bot Studio Frontend Application
+// Antigravity 2.0 • Desktop Studio Application Controller
 
-let currentBot = null;
-let botsList = [];
+let projects = [];
+let currentProjectId = null;
+let currentChatId = null;
+let currentChat = null;
 let currentEffort = 'high';
 let isGenerating = false;
 let authStatus = { authenticated: false, email: null, subscription: 'none' };
+let editingChatId = null;
 
-// Initialize Application
+// Initialize on DOM load
 document.addEventListener('DOMContentLoaded', async () => {
-  await checkStatus();
-  await loadBots();
+  await checkAuthStatus();
+  await loadProjects();
 });
 
-// Check Google Auth & Subscription Status
-async function checkStatus(forceRefresh = false) {
+// ================= GOOGLE AUTH & SUBSCRIPTION =================
+
+async function checkAuthStatus(forceRefresh = false) {
   try {
     const url = forceRefresh ? '/api/status?refresh=1' : '/api/status';
     const res = await fetch(url);
@@ -28,7 +32,7 @@ async function checkStatus(forceRefresh = false) {
     if (!data.authenticated) {
       emailEl.textContent = 'Вход не выполнен';
       avatarEl.textContent = '?';
-      statusTextEl.textContent = 'Требуется Google вход';
+      statusTextEl.textContent = 'Требуется вход Google';
       statusDot.className = 'status-dot no-sub';
       showAuthModal(data);
     } else if (data.subscription === 'none') {
@@ -44,11 +48,10 @@ async function checkStatus(forceRefresh = false) {
       statusDot.className = 'status-dot';
     }
   } catch (err) {
-    console.error('Failed to check status:', err);
+    console.error('Failed to check auth status:', err);
   }
 }
 
-// Show Google Auth / Subscription Modal
 function showAuthModal(data) {
   const modal = document.getElementById('auth-modal');
   const body = document.getElementById('auth-modal-body');
@@ -60,7 +63,7 @@ function showAuthModal(data) {
         <strong>⚠️ Требуется авторизация Google:</strong><br>
         Для работы ядра Antigravity 2.0 необходим аккаунт Google с активной подпиской.
       </div>
-      <p style="font-size: 13px; color: var(--text-secondary);">
+      <p style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;">
         Нажмите кнопку ниже, чтобы открыть официальную страницу входа в Google Аккаунт.
       </p>
     `;
@@ -72,9 +75,9 @@ function showAuthModal(data) {
         <strong>❌ Отсутствует активная подписка:</strong><br>
         Аккаунт <b>${data.email}</b> подключен, но не имеет активной подписки Google Antigravity (Gemini Advanced).
       </div>
-      <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
-        Использование моделей временно заблокировано до активации подписки.<br>
-        Оформить подписку можно в панели Google One.
+      <p style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;">
+        Использование моделей заблокировано до активации подписки.<br>
+        Оформить подписку можно в панели Google One / Antigravity.
       </p>
     `;
     actionBtn.textContent = 'Оформить подписку';
@@ -86,12 +89,12 @@ function showAuthModal(data) {
         Аккаунт <b>${data.email}</b> успешно авторизован.<br>
         Подписка Google Antigravity 2.0 активна.
       </div>
-      <p style="font-size: 13px; color: var(--text-secondary);">
+      <p style="font-size: 12.5px; color: var(--text-secondary);">
         Ядро готово к генерации ответов и выполнению кода.
       </p>
     `;
     actionBtn.textContent = 'Обновить статус';
-    actionBtn.onclick = () => checkStatus(true);
+    actionBtn.onclick = () => checkAuthStatus(true);
   }
 
   modal.style.display = 'flex';
@@ -105,100 +108,370 @@ function closeAuthModal() {
   document.getElementById('auth-modal').style.display = 'none';
 }
 
-// Load Bots list from API
-async function loadBots() {
-  try {
-    const res = await fetch('/api/bots');
-    botsList = await res.json();
-    renderPersonas();
+// ================= PROJECTS MANAGEMENT =================
 
-    if (botsList.length > 0 && !currentBot) {
-      selectBot(botsList[0].id);
-    }
+async function loadProjects() {
+  try {
+    const res = await fetch('/api/projects');
+    const data = await res.json();
+    projects = data.projects || [];
+    currentProjectId = data.active_id || (projects[0] ? projects[0].id : null);
+
+    renderProjectsMenu();
+    updateProjectHeader();
+    await loadChats();
   } catch (err) {
-    console.error('Failed to load bots:', err);
+    console.error('Failed to load projects:', err);
   }
 }
 
-// Render Personas in sidebar
-function renderPersonas() {
-  const container = document.getElementById('personas-list');
+function renderProjectsMenu() {
+  const listEl = document.getElementById('projects-list');
+  listEl.innerHTML = '';
+
+  projects.forEach(p => {
+    const item = document.createElement('button');
+    item.className = `dropdown-item ${p.id === currentProjectId ? 'active' : ''}`;
+    item.innerHTML = `<span>${p.icon || '📁'}</span> <span>${escapeHtml(p.name)}</span>`;
+    item.onclick = () => selectProject(p.id);
+    listEl.appendChild(item);
+  });
+}
+
+function updateProjectHeader() {
+  const current = projects.find(p => p.id === currentProjectId) || projects[0];
+  if (current) {
+    document.getElementById('current-proj-icon').textContent = current.icon || '📁';
+    document.getElementById('current-proj-name').textContent = current.name;
+    document.getElementById('header-project-pill').textContent = `${current.icon || '📁'} ${current.name}`;
+  }
+}
+
+function toggleProjectMenu() {
+  const menu = document.getElementById('project-dropdown-menu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', (e) => {
+  const container = document.querySelector('.project-selector-container');
+  if (container && !container.contains(e.target)) {
+    document.getElementById('project-dropdown-menu').style.display = 'none';
+  }
+});
+
+async function selectProject(pid) {
+  document.getElementById('project-dropdown-menu').style.display = 'none';
+  if (pid === currentProjectId) return;
+
+  try {
+    await fetch('/api/projects/select', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: pid })
+    });
+    currentProjectId = pid;
+    renderProjectsMenu();
+    updateProjectHeader();
+    await loadChats();
+  } catch (err) {
+    console.error('Failed to select project:', err);
+  }
+}
+
+function openNewProjectModal() {
+  document.getElementById('project-dropdown-menu').style.display = 'none';
+  document.getElementById('project-name-input').value = '';
+  document.getElementById('project-icon-input').value = '📁';
+  document.getElementById('project-modal').style.display = 'flex';
+  document.getElementById('project-name-input').focus();
+}
+
+function closeProjectModal() {
+  document.getElementById('project-modal').style.display = 'none';
+}
+
+function setProjectEmoji(emoji) {
+  document.getElementById('project-icon-input').value = emoji;
+}
+
+async function submitProject() {
+  const name = document.getElementById('project-name-input').value.trim();
+  const icon = document.getElementById('project-icon-input').value.trim() || '📁';
+
+  if (!name) {
+    alert('Пожалуйста, введите название проекта.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, icon })
+    });
+    const newProj = await res.json();
+    closeProjectModal();
+    await loadProjects();
+    await selectProject(newProj.id);
+  } catch (err) {
+    alert('Ошибка при создании проекта: ' + err.message);
+  }
+}
+
+// ================= CHATS MANAGEMENT =================
+
+async function loadChats() {
+  try {
+    const res = await fetch(`/api/chats?project_id=${currentProjectId || ''}`);
+    const data = await res.json();
+    const chats = data.chats || [];
+    currentChatId = data.active_id || (chats[0] ? chats[0].id : null);
+
+    document.getElementById('chats-count').textContent = chats.length;
+    renderChatsList(chats);
+
+    if (currentChatId) {
+      await loadChatMessages(currentChatId);
+    } else if (chats.length > 0) {
+      await selectChat(chats[0].id);
+    } else {
+      // If no chats in this project, open empty state
+      document.getElementById('messages-container').innerHTML = '';
+      document.getElementById('header-chat-name').textContent = 'Нет диалогов';
+      document.getElementById('header-chat-icon').textContent = '💬';
+    }
+  } catch (err) {
+    console.error('Failed to load chats:', err);
+  }
+}
+
+function renderChatsList(chats) {
+  const container = document.getElementById('chats-list');
   container.innerHTML = '';
 
-  botsList.forEach(bot => {
+  chats.forEach(chat => {
     const item = document.createElement('div');
-    item.className = `persona-item ${currentBot && currentBot.id === bot.id ? 'active' : ''}`;
-    item.onclick = () => selectBot(bot.id);
+    item.className = `chat-item ${chat.id === currentChatId ? 'active' : ''}`;
+    item.onclick = (e) => {
+      if (!e.target.closest('.chat-item-actions')) {
+        selectChat(chat.id);
+      }
+    };
 
     item.innerHTML = `
-      <span class="persona-emoji">${bot.emoji || '🤖'}</span>
-      <div class="persona-meta">
-        <span class="persona-name">${escapeHtml(bot.name)}</span>
-        <span class="persona-tagline">${escapeHtml(bot.tagline || '')}</span>
+      <span class="chat-item-icon">${chat.icon || '💬'}</span>
+      <span class="chat-item-name">${escapeHtml(chat.name || 'Новый диалог')}</span>
+      <div class="chat-item-actions">
+        <button class="btn-item-action" onclick="openEditChatModal('${chat.id}')" title="Переименовать диалог">✏️</button>
+        <button class="btn-item-action" onclick="confirmDeleteChat('${chat.id}', event)" title="Удалить диалог">✕</button>
       </div>
     `;
     container.appendChild(item);
   });
 }
 
-// Select Active Bot
-function selectBot(botId) {
-  const bot = botsList.find(b => b.id === botId);
-  if (!bot) return;
+async function selectChat(chatId) {
+  if (chatId === currentChatId && currentChat) return;
 
-  currentBot = bot;
-  renderPersonas();
-
-  // Update header
-  document.getElementById('header-bot-avatar').textContent = bot.emoji || '🤖';
-  document.getElementById('header-bot-name').textContent = bot.name;
-  document.getElementById('header-bot-archetype').textContent = (bot.archetype || 'bot').toUpperCase();
-  document.getElementById('header-bot-tagline').textContent = bot.tagline || '';
-
-  // Set default model for this bot
-  if (bot.model) {
-    document.getElementById('model-select').value = bot.model;
+  try {
+    await fetch('/api/chats/select', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: chatId })
+    });
+    currentChatId = chatId;
+    await loadChats();
+  } catch (err) {
+    console.error('Failed to select chat:', err);
   }
+}
 
-  // Clear or render welcome message
+async function loadChatMessages(chatId) {
+  try {
+    const res = await fetch(`/api/chats/messages?id=${chatId}`);
+    if (!res.ok) return;
+
+    const chat = await res.json();
+    currentChat = chat;
+
+    // Update Header
+    document.getElementById('header-chat-icon').textContent = chat.icon || '💬';
+    document.getElementById('header-chat-name').textContent = chat.name || 'Новый диалог';
+    document.getElementById('header-model-pill').textContent = formatModelName(chat.model);
+    document.getElementById('header-effort-pill').textContent = `⚡ ${capitalize(chat.effort || 'high')} Reasoning`;
+
+    // Update Sidebar inputs
+    if (chat.model) {
+      document.getElementById('sidebar-model-select').value = chat.model;
+    }
+    if (chat.effort) {
+      setEffort(chat.effort, false);
+    }
+
+    // Render Messages
+    renderMessages(chat.messages || []);
+  } catch (err) {
+    console.error('Failed to load chat messages:', err);
+  }
+}
+
+function renderMessages(messages) {
   const container = document.getElementById('messages-container');
   container.innerHTML = '';
-  
-  let greeting = `${bot.emoji} Привет! Я на связи. Чем займемся сегодня?`;
-  if (bot.archetype && bot.archetype.includes('rebel')) {
-    greeting = `${bot.emoji} Ну что, готов к порции чистой правды и бодрого кода? Выкладывай вопрос, разберем без корпоративной цензуры! 🏴‍☠️`;
-  } else if (bot.archetype && bot.archetype.includes('thinker')) {
-    greeting = `${bot.emoji} Приветствую. Сформулируй задачу или гипотезу, разберем ее по первым принципам и пошаговой логике. 🧠`;
-  } else if (bot.archetype && bot.archetype.includes('coder')) {
-    greeting = `${bot.emoji} Терминал готов. Жду код, архитектурную дилемму или лог ошибки. 💻⚡`;
-  }
 
-  appendMessage('bot', greeting);
-}
-
-// Start New Chat
-function startNewChat() {
-  if (currentBot) {
-    selectBot(currentBot.id);
-  }
-}
-
-// Model & Effort settings
-function updateModelSelection() {
-  const model = document.getElementById('model-select').value;
-  if (currentBot) {
-    currentBot.model = model;
-  }
-}
-
-function setEffort(level) {
-  currentEffort = level;
-  document.querySelectorAll('.effort-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.effort === level);
+  messages.forEach(msg => {
+    appendMessage(msg.role, msg.content, msg.thoughts, false);
   });
+
+  scrollToBottom();
 }
 
-// Handle User Input & Sending
+function openNewChatModal() {
+  editingChatId = null;
+  document.getElementById('chat-modal-title').textContent = '💬 Новый диалог';
+  document.getElementById('chat-name-input').value = '';
+  document.getElementById('chat-icon-input').value = '💬';
+  document.getElementById('chat-modal').style.display = 'flex';
+  document.getElementById('chat-name-input').focus();
+}
+
+function openEditChatModal(chatId = null) {
+  editingChatId = chatId || currentChatId;
+  const chat = currentChat;
+  document.getElementById('chat-modal-title').textContent = '✏️ Редактирование диалога';
+  document.getElementById('chat-name-input').value = (chat && chat.name) ? chat.name : '';
+  document.getElementById('chat-icon-input').value = (chat && chat.icon) ? chat.icon : '💬';
+  document.getElementById('chat-modal').style.display = 'flex';
+  document.getElementById('chat-name-input').focus();
+}
+
+function closeChatModal() {
+  document.getElementById('chat-modal').style.display = 'none';
+  editingChatId = null;
+}
+
+function setChatEmoji(emoji) {
+  document.getElementById('chat-icon-input').value = emoji;
+}
+
+async function submitChatModal() {
+  const name = document.getElementById('chat-name-input').value.trim();
+  const icon = document.getElementById('chat-icon-input').value.trim() || '💬';
+
+  if (!name) {
+    alert('Пожалуйста, введите название диалога.');
+    return;
+  }
+
+  try {
+    if (editingChatId) {
+      // Update existing chat
+      await fetch('/api/chats/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingChatId, name, icon })
+      });
+      closeChatModal();
+      await loadChats();
+    } else {
+      // Create new chat
+      const model = document.getElementById('sidebar-model-select').value;
+      const res = await fetch('/api/chats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: currentProjectId,
+          name,
+          icon,
+          model
+        })
+      });
+      const newChat = await res.json();
+      closeChatModal();
+      await loadChats();
+      await selectChat(newChat.id);
+    }
+  } catch (err) {
+    alert('Ошибка при сохранении диалога: ' + err.message);
+  }
+}
+
+async function confirmDeleteChat(chatId, event) {
+  if (event) event.stopPropagation();
+  if (confirm('Вы уверены, что хотите удалить этот диалог?')) {
+    try {
+      await fetch('/api/chats/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: chatId })
+      });
+      await loadChats();
+    } catch (err) {
+      alert('Ошибка при удалении диалога: ' + err.message);
+    }
+  }
+}
+
+async function clearCurrentChat() {
+  if (!currentChatId) return;
+  if (confirm('Очистить все сообщения в текущем диалоге?')) {
+    try {
+      await fetch('/api/chats/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentChatId })
+      });
+      await loadChatMessages(currentChatId);
+    } catch (err) {
+      alert('Ошибка при очистке диалога: ' + err.message);
+    }
+  }
+}
+
+async function exportCurrentChat() {
+  if (!currentChatId) return;
+  try {
+    const res = await fetch(`/api/chats/export?id=${currentChatId}`);
+    const data = await res.json();
+    alert('Диалог сохранен в файл:\n' + data.path);
+  } catch (err) {
+    alert('Ошибка сохранения: ' + err.message);
+  }
+}
+
+// ================= MODEL & EFFORT SETTINGS =================
+
+async function onSidebarModelChange() {
+  const model = document.getElementById('sidebar-model-select').value;
+  if (currentChatId) {
+    await fetch('/api/chats/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: currentChatId, model })
+    });
+    document.getElementById('header-model-pill').textContent = formatModelName(model);
+  }
+}
+
+async function setEffort(level, saveToBackend = true) {
+  currentEffort = level;
+  document.querySelectorAll('.effort-pill').forEach(pill => {
+    pill.classList.toggle('active', pill.dataset.effort === level);
+  });
+  document.getElementById('header-effort-pill').textContent = `⚡ ${capitalize(level)} Reasoning`;
+
+  if (saveToBackend && currentChatId) {
+    await fetch('/api/chats/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: currentChatId, effort: level })
+    });
+  }
+}
+
+// ================= CHAT MESSAGING =================
+
 async function sendMessage() {
   if (isGenerating) return;
 
@@ -206,7 +479,12 @@ async function sendMessage() {
   const text = textarea.value.trim();
   if (!text) return;
 
-  // Append user message to UI
+  if (!currentChatId) {
+    openNewChatModal();
+    return;
+  }
+
+  // Append user message immediately
   appendMessage('user', text);
   textarea.value = '';
   autoResizeTextarea(textarea);
@@ -214,19 +492,17 @@ async function sendMessage() {
   // Set thinking state
   isGenerating = true;
   const indicator = document.getElementById('thinking-indicator');
-  const thinkingText = document.getElementById('thinking-text');
-  thinkingText.textContent = `${currentBot ? currentBot.name : 'Грок'} размышляет над ответом...`;
   indicator.style.display = 'flex';
   scrollToBottom();
 
-  const model = document.getElementById('model-select').value;
+  const model = document.getElementById('sidebar-model-select').value;
 
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        bot_id: currentBot ? currentBot.id : 'grok_fun',
+        chat_id: currentChatId,
         message: text,
         model: model,
         effort: currentEffort
@@ -239,31 +515,29 @@ async function sendMessage() {
 
     if (data.error === 'subscription_required' || data.error === 'auth_required') {
       showAuthModal(data);
-      appendMessage('bot', data.reply || data.message || 'Ошибка подписки.');
+      appendMessage('assistant', data.reply || data.message || 'Ошибка доступа к модели.');
     } else if (data.reply) {
-      appendMessage('bot', data.reply, data.thoughts);
+      appendMessage('assistant', data.reply, data.thoughts);
     } else {
-      appendMessage('bot', `❌ Ошибка: ${data.message || 'Не удалось получить ответ'}`);
+      appendMessage('assistant', `❌ Ошибка: ${data.message || 'Не удалось получить ответ'}`);
     }
   } catch (err) {
     indicator.style.display = 'none';
     isGenerating = false;
-    appendMessage('bot', `❌ Ошибка соединения с сервером: ${err.message}`);
+    appendMessage('assistant', `❌ Ошибка соединения с сервером: ${err.message}`);
   }
 }
 
-// Append message card to UI
-function appendMessage(role, content, thoughts = '') {
+function appendMessage(role, content, thoughts = '', scroll = true) {
   const container = document.getElementById('messages-container');
   const card = document.createElement('div');
   card.className = `message-card ${role}`;
 
-  const avatar = role === 'user' ? '👤' : (currentBot ? currentBot.emoji : '🤖');
-  const author = role === 'user' ? 'Вы' : (currentBot ? currentBot.name : 'Бот');
+  const avatar = role === 'user' ? '👤' : '✦';
+  const author = role === 'user' ? 'Вы' : 'Antigravity 2.0';
 
   let bodyHtml = '';
 
-  // If there are reasoning thoughts, show expandable block
   if (thoughts && thoughts.trim()) {
     bodyHtml += `
       <div class="thought-box">
@@ -287,7 +561,7 @@ function appendMessage(role, content, thoughts = '') {
   `;
 
   container.appendChild(card);
-  scrollToBottom();
+  if (scroll) scrollToBottom();
 }
 
 function toggleThought(headerEl) {
@@ -297,12 +571,12 @@ function toggleThought(headerEl) {
   }
 }
 
-// Simple Markdown Formatter
+// Markdown Formatter
 function formatMarkdown(text) {
   if (!text) return '';
   let html = escapeHtml(text);
 
-  // Fenced Code Blocks with copy button
+  // Fenced Code Blocks with Copy button
   html = html.replace(/```([a-zA-Z0-9_\-\+]*)\n([\s\S]*?)```/g, (match, lang, code) => {
     const id = 'code-' + Math.random().toString(36).substring(2, 9);
     return `
@@ -323,9 +597,9 @@ function formatMarkdown(text) {
   html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
 
   // Headers
-  html = html.replace(/^### (.*$)/gim, '<h4 style="margin: 8px 0 4px; color: var(--accent-blue);">$1</h4>');
-  html = html.replace(/^## (.*$)/gim, '<h3 style="margin: 10px 0 6px; color: var(--text-primary);">$1</h3>');
-  html = html.replace(/^# (.*$)/gim, '<h2 style="margin: 12px 0 8px; color: var(--accent-purple);">$1</h2>');
+  html = html.replace(/^### (.*$)/gim, '<h4 style="margin: 8px 0 4px; color: var(--accent-primary);">$1</h4>');
+  html = html.replace(/^## (.*$)/gim, '<h3 style="margin: 10px 0 6px; color: var(--text-main);">$1</h3>');
+  html = html.replace(/^# (.*$)/gim, '<h2 style="margin: 12px 0 8px; color: var(--accent-indigo);">$1</h2>');
 
   // Line breaks
   html = html.replace(/\n/g, '<br>');
@@ -346,7 +620,6 @@ function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, m => map[m]);
 }
 
-// Auto resize textarea
 function autoResizeTextarea(el) {
   el.style.height = 'auto';
   el.style.height = Math.min(el.scrollHeight, 160) + 'px';
@@ -371,79 +644,15 @@ function scrollToBottom() {
   container.scrollTop = container.scrollHeight;
 }
 
-// Custom Bot Modal Functions
-function openCreateBotModal() {
-  document.getElementById('create-bot-modal').style.display = 'flex';
+function formatModelName(model) {
+  if (!model) return 'Gemini 3.8 Flash';
+  if (model.includes('3.8-flash')) return 'Gemini 3.8 Flash';
+  if (model.includes('3.1-pro')) return 'Gemini 3.1 Pro';
+  if (model.includes('sonnet')) return 'Claude Sonnet';
+  return model;
 }
 
-function closeCreateBotModal() {
-  document.getElementById('create-bot-modal').style.display = 'none';
-}
-
-async function submitCreateBot() {
-  const name = document.getElementById('new-bot-name').value.trim();
-  const emoji = document.getElementById('new-bot-emoji').value.trim() || '🤖';
-  const tagline = document.getElementById('new-bot-tagline').value.trim();
-  const archetype = document.getElementById('new-bot-archetype').value;
-  const humor = parseInt(document.getElementById('new-bot-humor').value, 10);
-  const prompt = document.getElementById('new-bot-prompt').value.trim();
-
-  if (!name) {
-    alert('Пожалуйста, введите имя бота.');
-    return;
-  }
-
-  try {
-    const res = await fetch('/api/bots', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name, emoji, tagline, archetype,
-        humor_level: humor,
-        system_prompt: prompt || 'Ты умный персональный ИИ-ассистент в стиле Grok.'
-      })
-    });
-
-    const newBot = await res.json();
-    closeCreateBotModal();
-    await loadBots();
-    selectBot(newBot.id);
-  } catch (err) {
-    alert('Ошибка при создании бота: ' + err.message);
-  }
-}
-
-// Clear Chat
-function clearCurrentChat() {
-  if (confirm('Очистить историю текущего диалога?')) {
-    startNewChat();
-  }
-}
-
-// Export Chat Markdown
-async function saveChatMarkdown() {
-  if (!currentBot) return;
-  try {
-    const res = await fetch(`/api/export-chat?bot_id=${currentBot.id}`);
-    const data = await res.json();
-    alert('Диалог сохранен в файл:\n' + data.path);
-  } catch (err) {
-    alert('Ошибка сохранения: ' + err.message);
-  }
-}
-
-// Export Bot to Antigravity Rules
-async function exportCurrentToRules() {
-  if (!currentBot) return;
-  try {
-    const res = await fetch('/api/export-rules', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bot_id: currentBot.id })
-    });
-    const data = await res.json();
-    alert('Правило успешно создано в Antigravity:\n' + data.path);
-  } catch (err) {
-    alert('Ошибка экспорта: ' + err.message);
-  }
+function capitalize(str) {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }

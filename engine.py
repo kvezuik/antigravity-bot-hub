@@ -147,50 +147,49 @@ def check_google_auth_and_subscription(force_refresh: bool = False) -> Dict[str,
 
 
 class ChatEngine:
-    def __init__(self, bot: Dict[str, Any]):
-        self.bot = bot
+    def __init__(self, chat_id: Optional[str] = None):
+        self.chat_id = chat_id
         self.history: List[Dict[str, str]] = []
         os.makedirs(HISTORY_DIR, exist_ok=True)
 
+    def set_history(self, messages: List[Dict[str, str]]) -> None:
+        self.history = messages
+
     def add_message(self, role: str, content: str, thoughts: str = "") -> None:
-        self.history.append({
+        msg = {
             "role": role,
             "content": content,
             "thoughts": thoughts,
             "time": time.strftime("%H:%M:%S")
-        })
-        if role == "assistant":
-            record_message(self.bot.get("id", ""))
+        }
+        self.history.append(msg)
+        if self.chat_id:
+            from store import add_message_to_chat
+            add_message_to_chat(self.chat_id, role, content, thoughts)
 
     def clear_history(self) -> None:
         self.history = []
+        if self.chat_id:
+            from store import clear_chat_history
+            clear_chat_history(self.chat_id)
 
     def build_prompt(self, user_text: str) -> str:
-        """Construct full prompt with persona instructions and recent dialog context."""
+        """Construct prompt with system directive and recent dialog context."""
         parts = []
-        parts.append("### СИСТЕМНАЯ ДИРЕКТИВА ДЛЯ ИИ-ПЕРСОНЫ:")
-        parts.append(self.bot.get("system_prompt", "Ты полезный и умный ассистент."))
-        parts.append("\nПАРАМЕТРЫ ЛИЧНОСТИ:")
-        parts.append(f"- Имя персонажа: {self.bot.get('name')}")
-        parts.append(f"- Главный эмодзи: {self.bot.get('emoji')}")
-        parts.append(f"- Уровень сарказма/юмора: {self.bot.get('humor_level', 50)}%")
-        parts.append(f"- Креативность: {self.bot.get('creativity_temp', 0.7)}")
-        parts.append(f"- Архетип: {self.bot.get('archetype', 'general')}")
-        
-        if self.bot.get("humor_level", 50) > 60:
-            parts.append("ИНСТРУКЦИЯ ПО СТИЛЮ: Отвечай в дерзком, живом, остроумном стиле Grok — с тонким юмором, без корпоративной занудности, но строго по делу и с безупречной технической точностью.")
+        parts.append("### СИСТЕМНАЯ ДИРЕКТИВА ANTIGRAVITY 2.0:")
+        parts.append("Ты — интеллектуальный ассистент разработки Google Antigravity 2.0. Отвечай точно, профессионально, понятно и по существу. Предоставляй чистый и безопасный код, исчерпывающие объяснения и пошаговый анализ.")
 
         parts.append("\n### ИСТОРИЯ ДИАЛОГА:")
-        recent = self.history[-10:]
+        recent = self.history[-12:]
         if not recent:
             parts.append("(Начало разговора)")
         else:
             for msg in recent:
-                speaker = "Пользователь" if msg["role"] == "user" else self.bot.get("name", "Бот")
+                speaker = "Пользователь" if msg["role"] == "user" else "Ассистент"
                 parts.append(f"{speaker}: {msg['content']}")
 
         parts.append(f"\nПользователь: {user_text}")
-        parts.append(f"{self.bot.get('name', 'Бот')}:")
+        parts.append("Ассистент:")
         return "\n".join(parts)
 
     def generate_response(
@@ -237,7 +236,7 @@ class ChatEngine:
             self.add_message("assistant", err)
             return err, ""
 
-        model = model_override or self.bot.get("model", "gemini-3.8-flash-high")
+        model = model_override or "gemini-3.8-flash-high"
         effort = effort_override or "high"
 
         full_prompt = self.build_prompt(user_text)
@@ -305,20 +304,19 @@ class ChatEngine:
             self.add_message("assistant", err_reply)
             return err_reply, ""
 
-    def save_session_markdown(self) -> str:
+    def save_session_markdown(self, title: str = "Диалог") -> str:
         """Export current session history to a Markdown file."""
         if not self.history:
             return ""
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        filename = f"{self.bot.get('id', 'bot')}_{timestamp}.md"
+        safe_title = "".join(c for c in title if c.isalnum() or c in (" ", "_", "-")).strip() or "chat"
+        filename = f"{safe_title}_{timestamp}.md"
         filepath = os.path.join(HISTORY_DIR, filename)
         
         lines = [
-            f"# Диалог с {self.bot.get('emoji', '')} {self.bot.get('name', 'Бот')} [Antigravity 2.0 Grok Edition]",
+            f"# {title} — Antigravity 2.0",
             f"- **Дата**: {time.strftime('%Y-%m-%d %H:%M:%S')}",
-            f"- **Модель**: `{self.bot.get('model', 'gemini-3.8-flash-high')}`",
-            f"- **Юмор**: {self.bot.get('humor_level', 50)}%",
-            f"- **Теглайн**: {self.bot.get('tagline', '')}",
+            f"- **Сообщений**: {len(self.history)}",
             "",
             "---",
             ""
@@ -326,11 +324,11 @@ class ChatEngine:
         
         for msg in self.history:
             if msg["role"] == "user":
-                lines.append(f"### 👤 Вы ({msg.get('time', '')})")
+                lines.append(f"### 👤 Пользователь ({msg.get('time', '')})")
                 lines.append(msg["content"])
                 lines.append("")
             else:
-                lines.append(f"### {self.bot.get('emoji', '🤖')} {self.bot.get('name', 'Бот')} ({msg.get('time', '')})")
+                lines.append(f"### 🤖 Antigravity 2.0 ({msg.get('time', '')})")
                 if msg.get("thoughts"):
                     lines.append(f"> **💭 Размышления:**\n> {msg['thoughts']}\n")
                 lines.append(msg["content"])

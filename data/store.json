@@ -1,0 +1,31 @@
+{
+  "active_project_id": "proj_default",
+  "active_chat_id": "chat_default",
+  "projects": [
+    {
+      "id": "proj_default",
+      "name": "Основной проект",
+      "icon": "📁",
+      "created_at": "2026-09-20 20:18:09"
+    }
+  ],
+  "chats": [
+    {
+      "id": "chat_default",
+      "project_id": "proj_default",
+      "name": "Новый диалог",
+      "icon": "💬",
+      "model": "gemini-3.8-flash-high",
+      "effort": "high",
+      "messages": [
+        {
+          "role": "assistant",
+          "content": "Привет! Я ассистент Antigravity 2.0. Чем могу помочь по коду, архитектуре или задачам?",
+          "thoughts": "",
+          "time": "20:18:09"
+        }
+      ],
+      "created_at": "2026-09-20 20:18:09"
+    }
+  ]
+}

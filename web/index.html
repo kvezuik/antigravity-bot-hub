@@ -3,134 +3,160 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Antigravity 2.0 • Grok Bot Studio</title>
+  <title>Antigravity 2.0 • Desktop Studio</title>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" type="image/png" href="icon.png">
 </head>
 <body>
   <div class="app-layout">
-    <!-- Left Sidebar (Antigravity 2.0 style) -->
+    <!-- Left-hand Sidebar (Antigravity 2.0) -->
     <aside class="sidebar">
+      <!-- Top Brand Header -->
       <div class="sidebar-header">
         <div class="brand">
           <div class="brand-orb"></div>
           <div>
-            <div class="brand-title">Antigravity <span class="badge-accent">2.0</span></div>
-            <div class="brand-sub">GROK BOT EDITION</div>
+            <div class="brand-title">Antigravity <span class="badge-version">2.0</span></div>
+            <div class="brand-sub">DESKTOP STUDIO</div>
           </div>
         </div>
       </div>
 
-      <!-- Google Account & Subscription Status Card -->
-      <div class="account-card" id="account-card" onclick="openAuthModal()">
-        <div class="account-avatar" id="account-avatar">G</div>
-        <div class="account-info">
-          <div class="account-email" id="account-email">Проверка Google...</div>
-          <div class="subscription-status" id="subscription-status">
-            <span class="status-dot"></span>
-            <span id="status-text">Проверка...</span>
+      <!-- Project Selector & Management -->
+      <div class="project-selector-container">
+        <div class="section-label">ПРОЕКТ</div>
+        <div class="project-selector-bar">
+          <button class="project-dropdown-btn" id="project-dropdown-btn" onclick="toggleProjectMenu()">
+            <span class="proj-icon" id="current-proj-icon">📁</span>
+            <span class="proj-name" id="current-proj-name">Основной проект</span>
+            <span class="dropdown-chevron">▾</span>
+          </button>
+          <button class="btn-icon-action" onclick="openNewProjectModal()" title="Создать новый проект">＋</button>
+        </div>
+
+        <!-- Project Switcher Dropdown Menu -->
+        <div class="project-dropdown-menu" id="project-dropdown-menu" style="display: none;">
+          <div class="project-list" id="projects-list">
+            <!-- Projects injected via JS -->
           </div>
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item add-proj-item" onclick="openNewProjectModal()">
+            <span>＋</span> Создать проект...
+          </button>
         </div>
       </div>
 
-      <button class="btn btn-primary btn-new-chat" onclick="startNewChat()">
+      <!-- New Chat Button -->
+      <button class="btn btn-primary btn-new-chat" onclick="openNewChatModal()">
         <span class="icon">＋</span> Новый диалог
       </button>
 
-      <!-- Bot Personas Section -->
-      <div class="sidebar-section">
-        <div class="section-title">
-          <span>AI-ЛИЧНОСТИ (GROK)</span>
-          <button class="btn-icon-small" onclick="openCreateBotModal()" title="Создать своего бота">＋</button>
+      <!-- Individual Chats List -->
+      <div class="chats-section">
+        <div class="section-label-row">
+          <span class="section-label">ДИАЛОГИ В ПРОЕКТЕ</span>
+          <span class="chats-count" id="chats-count">0</span>
         </div>
-        <div class="personas-list" id="personas-list">
-          <!-- Populated by JavaScript -->
-        </div>
-      </div>
-
-      <!-- Settings & Model Selection -->
-      <div class="sidebar-section settings-section">
-        <div class="section-title">ПАРАМЕТРЫ ЯДРА</div>
-        
-        <label class="setting-label">Модель LLM:</label>
-        <select id="model-select" class="form-select" onchange="updateModelSelection()">
-          <option value="gemini-3.8-flash-high" selected>Gemini 3.8 Flash (High) ⚡ [Рекомендуется]</option>
-          <option value="gemini-3.1-pro-high">Gemini 3.1 Pro (High) 🧠 [Архитектура]</option>
-          <option value="gemini-3.7-flash-high">Gemini 3.7 Flash (High)</option>
-          <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
-          <option value="gpt-oss-120b-medium">GPT-OSS 120B</option>
-        </select>
-
-        <label class="setting-label">Глубина размышлений (Reasoning):</label>
-        <div class="effort-toggle">
-          <button class="effort-btn active" data-effort="high" onclick="setEffort('high')">High ⚡</button>
-          <button class="effort-btn" data-effort="medium" onclick="setEffort('medium')">Medium</button>
-          <button class="effort-btn" data-effort="low" onclick="setEffort('low')">Low</button>
+        <div class="chats-list" id="chats-list">
+          <!-- Populated by JS -->
         </div>
       </div>
 
-      <!-- History / Actions -->
+      <!-- Bottom Settings & Account Area -->
       <div class="sidebar-footer">
-        <button class="btn-ghost" onclick="exportCurrentToRules()">
-          <span class="icon">📑</span> Экспорт в .agents/rules
-        </button>
-        <div class="version-tag">Core: termux-harness / agy v2.0</div>
-      </div>
-    </aside>
-
-    <!-- Main Chat Canvas -->
-    <main class="chat-canvas">
-      <!-- Chat Canvas Header -->
-      <header class="canvas-header">
-        <div class="current-bot-info">
-          <div class="bot-avatar-large" id="header-bot-avatar">🏴‍☠️</div>
-          <div>
-            <div class="bot-header-title">
-              <span id="header-bot-name">Grok Fun</span>
-              <span class="archetype-pill" id="header-bot-archetype">Rebel</span>
+        <!-- Model & Effort Controls -->
+        <div class="quick-settings-box">
+          <div class="setting-row">
+            <span class="setting-title">Модель:</span>
+            <select id="sidebar-model-select" class="form-select-sm" onchange="onSidebarModelChange()">
+              <option value="gemini-3.8-flash-high" selected>Gemini 3.8 Flash (High) ⚡</option>
+              <option value="gemini-3.1-pro-high">Gemini 3.1 Pro (High) 🧠</option>
+              <option value="gemini-3.7-flash-high">Gemini 3.7 Flash</option>
+              <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+              <option value="gpt-oss-120b-medium">GPT-OSS 120B</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <span class="setting-title">Мышление:</span>
+            <div class="effort-pills">
+              <button class="effort-pill active" data-effort="high" onclick="setEffort('high')">High ⚡</button>
+              <button class="effort-pill" data-effort="medium" onclick="setEffort('medium')">Medium</button>
+              <button class="effort-pill" data-effort="low" onclick="setEffort('low')">Low</button>
             </div>
-            <div class="bot-header-desc" id="header-bot-tagline">Саркастичный и остроумный критик</div>
           </div>
         </div>
 
-        <div class="header-actions">
-          <button class="btn-ghost" onclick="clearCurrentChat()" title="Очистить диалог">🗑️ Очистить</button>
-          <button class="btn-ghost" onclick="saveChatMarkdown()" title="Скачать в Markdown">💾 Сохранить</button>
+        <!-- Google Account & Subscription Status Card -->
+        <div class="account-card" id="account-card" onclick="openAuthModal()">
+          <div class="account-avatar" id="account-avatar">G</div>
+          <div class="account-details">
+            <div class="account-email" id="account-email">Проверка Google...</div>
+            <div class="subscription-status" id="subscription-status">
+              <span class="status-dot"></span>
+              <span id="status-text">Проверка...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Chat Canvas (Antigravity 2.0) -->
+    <main class="chat-canvas">
+      <!-- Top Canvas Header -->
+      <header class="canvas-header">
+        <div class="active-chat-info">
+          <button class="chat-icon-badge" id="header-chat-icon" onclick="openEditChatModal()" title="Изменить иконку">💬</button>
+          <div class="chat-title-group">
+            <div class="chat-title-row">
+              <h2 class="chat-title" id="header-chat-name">Новый диалог</h2>
+              <button class="btn-edit-inline" onclick="openEditChatModal()" title="Переименовать диалог">✏️</button>
+            </div>
+            <div class="chat-meta-row">
+              <span class="project-pill" id="header-project-pill">📁 Основной проект</span>
+              <span class="model-pill" id="header-model-pill">Gemini 3.8 Flash</span>
+              <span class="effort-pill-badge" id="header-effort-pill">⚡ High Reasoning</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="canvas-actions">
+          <button class="btn-ghost" onclick="exportCurrentChat()" title="Экспорт диалога в Markdown">💾 Экспорт</button>
+          <button class="btn-ghost" onclick="clearCurrentChat()" title="Очистить сообщения">🗑️ Очистить</button>
         </div>
       </header>
 
-      <!-- Messages Stream Area -->
+      <!-- Message Feed Area -->
       <div class="messages-container" id="messages-container">
-        <!-- Messages will be appended here -->
+        <!-- Messages appended here -->
       </div>
 
-      <!-- Typing & Thinking Indicator -->
+      <!-- Thinking Animation Indicator -->
       <div class="thinking-indicator" id="thinking-indicator" style="display: none;">
-        <div class="pulsing-orb"></div>
-        <span class="thinking-text" id="thinking-text">Грок размышляет над ответом...</span>
+        <div class="thinking-spinner"></div>
+        <span class="thinking-text" id="thinking-text">Antigravity 2.0 размышляет над ответом...</span>
       </div>
 
-      <!-- Bottom Chat Input Bar (Grok Style) -->
+      <!-- Floating Prompt Input Container -->
       <div class="chat-input-wrapper">
-        <!-- Quick Action Chips -->
+        <!-- Quick Action Suggestion Chips -->
         <div class="quick-chips">
-          <button class="chip" onclick="insertPrompt('/roast ')">🔥 Прожарка</button>
-          <button class="chip" onclick="insertPrompt('/code ')">💻 Напиши код</button>
-          <button class="chip" onclick="insertPrompt('Объясни простыми словами: ')">💡 Объясни</button>
-          <button class="chip" onclick="insertPrompt('Найди логическую ошибку в: ')">🔍 Ревизия</button>
+          <button class="chip" onclick="insertPrompt('Напиши чистый и безопасный код для: ')">💻 Напиши код</button>
+          <button class="chip" onclick="insertPrompt('Проведи ревизию и рефакторинг этого решения: ')">🛠️ Рефакторинг</button>
+          <button class="chip" onclick="insertPrompt('Найди причину бага или логическую ошибку в: ')">🔍 Поиск багов</button>
+          <button class="chip" onclick="insertPrompt('Объясни архитектурные альтернативы для: ')">🏛️ Архитектура</button>
         </div>
 
         <div class="input-box-container">
           <textarea
             id="chat-textarea"
             class="chat-textarea"
-            placeholder="Спросите Grok или поставьте задачу... (Shift+Enter — новая строка)"
+            placeholder="Спросите Antigravity 2.0 или опишите задачу... (Shift+Enter — новая строка)"
             rows="1"
             onkeydown="handleTextareaKey(event)"
             oninput="autoResizeTextarea(this)"
           ></textarea>
-          <button class="btn-send" id="btn-send" onclick="sendMessage()" title="Отправить сообщение">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <button class="btn-send" id="btn-send" onclick="sendMessage()" title="Отправить сообщение (Enter)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
               <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
             </svg>
           </button>
@@ -140,12 +166,76 @@
     </main>
   </div>
 
+  <!-- Modal: Create / Rename Project -->
+  <div class="modal-overlay" id="project-modal" style="display: none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="project-modal-title">📁 Новый проект</h3>
+        <button class="btn-close" onclick="closeProjectModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">Иконка проекта:</label>
+        <div class="emoji-picker-row">
+          <input type="text" id="project-icon-input" class="form-input emoji-input" value="📁" maxlength="4">
+          <div class="emoji-suggestions">
+            <span onclick="setProjectEmoji('📁')">📁</span>
+            <span onclick="setProjectEmoji('💻')">💻</span>
+            <span onclick="setProjectEmoji('🚀')">🚀</span>
+            <span onclick="setProjectEmoji('⚡')">⚡</span>
+            <span onclick="setProjectEmoji('📦')">📦</span>
+            <span onclick="setProjectEmoji('🧠')">🧠</span>
+            <span onclick="setProjectEmoji('🌐')">🌐</span>
+          </div>
+        </div>
+
+        <label class="form-label">Название проекта:</label>
+        <input type="text" id="project-name-input" class="form-input" placeholder="Например: Мой Веб-Сервис">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeProjectModal()">Отмена</button>
+        <button class="btn btn-primary" onclick="submitProject()">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Create / Rename Chat -->
+  <div class="modal-overlay" id="chat-modal" style="display: none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="chat-modal-title">💬 Новый диалог</h3>
+        <button class="btn-close" onclick="closeChatModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">Иконка диалога:</label>
+        <div class="emoji-picker-row">
+          <input type="text" id="chat-icon-input" class="form-input emoji-input" value="💬" maxlength="4">
+          <div class="emoji-suggestions">
+            <span onclick="setChatEmoji('💬')">💬</span>
+            <span onclick="setChatEmoji('⚡')">⚡</span>
+            <span onclick="setChatEmoji('🛠️')">🛠️</span>
+            <span onclick="setChatEmoji('💻')">💻</span>
+            <span onclick="setChatEmoji('🔍')">🔍</span>
+            <span onclick="setChatEmoji('📝')">📝</span>
+            <span onclick="setChatEmoji('🎯')">🎯</span>
+          </div>
+        </div>
+
+        <label class="form-label">Название диалога:</label>
+        <input type="text" id="chat-name-input" class="form-input" placeholder="Например: Рефакторинг базы данных">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeChatModal()">Отмена</button>
+        <button class="btn btn-primary" onclick="submitChatModal()">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Google Auth & Subscription Status -->
   <div class="modal-overlay" id="auth-modal" style="display: none;">
     <div class="modal-box">
       <div class="modal-header">
         <div class="google-badge-header">
-          <svg width="24" height="24" viewBox="0 0 24 24">
+          <svg width="22" height="22" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
             <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
             <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
@@ -156,49 +246,11 @@
         <button class="btn-close" onclick="closeAuthModal()">✕</button>
       </div>
       <div class="modal-body" id="auth-modal-body">
-        <!-- Filled dynamically -->
+        <!-- Injected via JS -->
       </div>
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="closeAuthModal()">Закрыть</button>
         <button class="btn btn-primary" id="modal-action-btn" onclick="handleAuthAction()">Обновить статус</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Create New Bot Persona -->
-  <div class="modal-overlay" id="create-bot-modal" style="display: none;">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3>🏴‍☠️ Создание нового Grok-бота</h3>
-        <button class="btn-close" onclick="closeCreateBotModal()">✕</button>
-      </div>
-      <div class="modal-body">
-        <label class="form-label">Имя бота:</label>
-        <input type="text" id="new-bot-name" class="form-input" placeholder="Например: Cyber Philosopher">
-
-        <label class="form-label">Главный эмодзи:</label>
-        <input type="text" id="new-bot-emoji" class="form-input" placeholder="🔥" value="🤖">
-
-        <label class="form-label">Краткий слоган:</label>
-        <input type="text" id="new-bot-tagline" class="form-input" placeholder="Мастер глубокого кода и архитектуры">
-
-        <label class="form-label">Архетип личности:</label>
-        <select id="new-bot-archetype" class="form-select">
-          <option value="grok_rebel">Grok Rebel (Остроумный бунтарь)</option>
-          <option value="coder">Cyber Coder (Технический эксперт)</option>
-          <option value="thinker">Deep Thinker (Философ и аналитик)</option>
-          <option value="zen">Zen Master (Лаконичный наставник)</option>
-        </select>
-
-        <label class="form-label">Уровень юмора и сарказма (0-100%):</label>
-        <input type="range" id="new-bot-humor" min="0" max="100" value="75" class="form-range">
-
-        <label class="form-label">Системная инструкция (System Prompt):</label>
-        <textarea id="new-bot-prompt" class="form-textarea" rows="3" placeholder="Ты персональный ассистент с характером..."></textarea>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" onclick="closeCreateBotModal()">Отмена</button>
-        <button class="btn btn-primary" onclick="submitCreateBot()">Создать бота</button>
       </div>
     </div>
   </div>
