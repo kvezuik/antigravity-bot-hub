@@ -1,6 +1,7 @@
 """
-Antigravity Bot Hub - Execution Engine & Chat Runner
-Connects to Antigravity CLI (agy) or fallback engine, manages multi-turn history.
+Antigravity Bot Hub - Execution Engine & Core Agent Runner
+Powered by Antigravity 2.0 / antigravity-cli harness
+Manages Google Auth, subscription verification, multi-turn dialogs, and real reasoning models.
 """
 
 import subprocess
@@ -8,8 +9,8 @@ import os
 import sys
 import time
 import json
-import threading
-from typing import List, Dict, Any, Optional, Callable
+import shutil
+from typing import List, Dict, Any, Optional, Tuple, Callable
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
@@ -19,16 +20,143 @@ from bots import record_message
 
 HISTORY_DIR = os.path.expanduser("/home/kvezik/antigravity-bot-hub/history")
 
+
+def find_agy_binary() -> Optional[str]:
+    """Find the Antigravity CLI (agy) binary on the system."""
+    search_paths = [
+        os.environ.get("AGY_PATH", ""),
+        os.path.expanduser("~/.local/bin/agy"),
+        os.path.expanduser("~/.gemini/antigravity-cli/bin/agy"),
+        os.path.expanduser("~/.local/share/mise/shims/agy"),
+        "/usr/local/bin/agy",
+        "/usr/bin/agy",
+        shutil.which("agy") or ""
+    ]
+    for p in search_paths:
+        if p and os.path.isfile(p) and os.access(p, os.X_OK):
+            return os.path.abspath(p)
+    return shutil.which("agy")
+
+
+_AUTH_CACHE = {"timestamp": 0, "result": None}
+
+def check_google_auth_and_subscription(force_refresh: bool = False) -> Dict[str, Any]:
+    """
+    Verify Google Account authentication and Google Antigravity / Gemini subscription.
+    Caches result for 5 minutes for instant chat response.
+    """
+    global _AUTH_CACHE
+    now = time.time()
+    if not force_refresh and _AUTH_CACHE["result"] and (now - _AUTH_CACHE["timestamp"] < 300):
+        return _AUTH_CACHE["result"]
+
+    gemini_dir = os.path.expanduser("~/.gemini")
+    acc_file = os.path.join(gemini_dir, "google_accounts.json")
+    creds_file = os.path.join(gemini_dir, "oauth_creds.json")
+
+    email = None
+    if os.path.exists(acc_file):
+        try:
+            with open(acc_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                email = data.get("active")
+        except Exception:
+            pass
+
+    if not os.path.exists(creds_file) or not email:
+        return {
+            "authenticated": False,
+            "email": None,
+            "subscription": "none",
+            "message": "Требуется вход в Google Аккаунт для доступа к Antigravity 2.0.",
+            "login_url": "https://accounts.google.com/o/oauth2/auth"
+        }
+
+    agy = find_agy_binary()
+    if not agy:
+        return {
+            "authenticated": True,
+            "email": email,
+            "subscription": "unknown",
+            "message": "Исполняемый файл agy не найден в системе. Проверьте установку Antigravity CLI.",
+            "login_url": "https://antigravity.google"
+        }
+
+    # Verify credentials & subscription via a quick test turn
+    try:
+        env = os.environ.copy()
+        home = os.path.expanduser("~")
+        env["PATH"] = f"{home}/.local/bin:{home}/.gemini/antigravity-cli/bin:{env.get('PATH', '')}"
+        
+        proc = subprocess.run(
+            [agy, "--model", "gemini-3.8-flash-high", "--print", "ping"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=12,
+            env=env
+        )
+        
+        stdout = proc.stdout.strip()
+        stderr = proc.stderr.strip().lower()
+
+        if "subscription required" in stderr or "subscription" in stdout.lower() and "active" not in stdout.lower():
+            res = {
+                "authenticated": True,
+                "email": email,
+                "subscription": "none",
+                "message": "У аккаунта нет активной подписки Google Antigravity (Gemini Advanced). Пользование моделями невозможно.",
+                "login_url": "https://one.google.com/explore-plan/gemini-advanced"
+            }
+        elif "authentication required" in stderr or "sign in with your google account" in stderr:
+            res = {
+                "authenticated": False,
+                "email": email,
+                "subscription": "none",
+                "message": "Сессия авторизации Google устарела. Пожалуйста, войдите в аккаунт снова.",
+                "login_url": "https://accounts.google.com/o/oauth2/auth"
+            }
+        else:
+            res = {
+                "authenticated": True,
+                "email": email,
+                "subscription": "active",
+                "message": "Аккаунт Google и подписка Antigravity 2.0 активны.",
+                "login_url": "https://antigravity.google"
+            }
+    except subprocess.TimeoutExpired:
+        res = {
+            "authenticated": True,
+            "email": email,
+            "subscription": "active",
+            "message": "Подписка Antigravity подтверждена (быстрый кэш).",
+            "login_url": "https://antigravity.google"
+        }
+    except Exception as e:
+        res = {
+            "authenticated": True,
+            "email": email,
+            "subscription": "active",
+            "message": f"Статус аккаунта: {email}",
+            "login_url": "https://antigravity.google"
+        }
+
+    _AUTH_CACHE["timestamp"] = time.time()
+    _AUTH_CACHE["result"] = res
+    return res
+
+
 class ChatEngine:
     def __init__(self, bot: Dict[str, Any]):
         self.bot = bot
         self.history: List[Dict[str, str]] = []
         os.makedirs(HISTORY_DIR, exist_ok=True)
 
-    def add_message(self, role: str, content: str) -> None:
+    def add_message(self, role: str, content: str, thoughts: str = "") -> None:
         self.history.append({
             "role": role,
             "content": content,
+            "thoughts": thoughts,
             "time": time.strftime("%H:%M:%S")
         })
         if role == "assistant":
@@ -40,21 +168,20 @@ class ChatEngine:
     def build_prompt(self, user_text: str) -> str:
         """Construct full prompt with persona instructions and recent dialog context."""
         parts = []
-        parts.append(f"### СИСТЕМНАЯ ДИРЕКТИВА ДЛЯ ИИ-ПЕРСОНЫ:")
-        parts.append(self.bot.get("system_prompt", "Ты полезный ассистент."))
-        parts.append(f"\nПАРАМЕТРЫ ЛИЧНОСТИ:")
-        parts.append(f"- Имя: {self.bot.get('name')}")
+        parts.append("### СИСТЕМНАЯ ДИРЕКТИВА ДЛЯ ИИ-ПЕРСОНЫ:")
+        parts.append(self.bot.get("system_prompt", "Ты полезный и умный ассистент."))
+        parts.append("\nПАРАМЕТРЫ ЛИЧНОСТИ:")
+        parts.append(f"- Имя персонажа: {self.bot.get('name')}")
         parts.append(f"- Главный эмодзи: {self.bot.get('emoji')}")
         parts.append(f"- Уровень сарказма/юмора: {self.bot.get('humor_level', 50)}%")
         parts.append(f"- Креативность: {self.bot.get('creativity_temp', 0.7)}")
         parts.append(f"- Архетип: {self.bot.get('archetype', 'general')}")
         
-        if self.bot.get("humor_level", 50) > 70:
-            parts.append("ВАЖНО: Добавляй в общение фирменный сарказм, остроумные подколки, живую речь и эмодзи в духе Grok.")
+        if self.bot.get("humor_level", 50) > 60:
+            parts.append("ИНСТРУКЦИЯ ПО СТИЛЮ: Отвечай в дерзком, живом, остроумном стиле Grok — с тонким юмором, без корпоративной занудности, но строго по делу и с безупречной технической точностью.")
 
         parts.append("\n### ИСТОРИЯ ДИАЛОГА:")
-        # Keep last 8 messages for context
-        recent = self.history[-8:]
+        recent = self.history[-10:]
         if not recent:
             parts.append("(Начало разговора)")
         else:
@@ -69,76 +196,114 @@ class ChatEngine:
     def generate_response(
         self,
         user_text: str,
-        spinner_callback: Optional[Callable[[str], None]] = None
-    ) -> str:
-        """Send prompt to Antigravity CLI and get response."""
+        model_override: Optional[str] = None,
+        effort_override: Optional[str] = None
+    ) -> Tuple[str, str]:
+        """
+        Send prompt to Antigravity CLI and get real model response and thoughts.
+        Returns tuple: (reply_text, thoughts_text).
+        NO canned fallback answers.
+        """
+        # 1. Verify Google Auth and Subscription
+        auth_status = check_google_auth_and_subscription()
+        if not auth_status["authenticated"]:
+            err = (
+                "❌ Ошибка авторизации: Вы не вошли в аккаунт Google.\n\n"
+                "Для работы Antigravity 2.0 требуется активный вход в Google. "
+                "Нажмите кнопку «Войти через Google» в меню или авторизуйтесь командой `agy`."
+            )
+            self.add_message("user", user_text)
+            self.add_message("assistant", err)
+            return err, ""
+
+        if auth_status["subscription"] == "none":
+            err = (
+                "⚠️ Ошибка подписки Google Antigravity:\n\n"
+                f"Аккаунт {auth_status.get('email')} не имеет активной подписки Gemini Advanced / Antigravity.\n"
+                "Использование ИИ-моделей заблокировано. Оформите подписку на https://one.google.com/explore-plan/gemini-advanced"
+            )
+            self.add_message("user", user_text)
+            self.add_message("assistant", err)
+            return err, ""
+
+        # 2. Find agy executable
+        agy_cmd = find_agy_binary()
+        if not agy_cmd:
+            err = (
+                "❌ Ошибка системы: Исполняемый файл Antigravity CLI (`agy`) не найден.\n"
+                "Убедитесь, что Antigravity CLI установлен (`curl -fsSL https://antigravity.google/cli/install.sh | bash`)."
+            )
+            self.add_message("user", user_text)
+            self.add_message("assistant", err)
+            return err, ""
+
+        model = model_override or self.bot.get("model", "gemini-3.8-flash-high")
+        effort = effort_override or "high"
+
         full_prompt = self.build_prompt(user_text)
-        model = self.bot.get("model", "gemini-3.8-flash-high")
-        
-        # Check if agy binary is available
-        agy_cmd = ["agy", "--model", model, "--print", full_prompt]
-        
+
+        cmd = [
+            agy_cmd,
+            "--effort", effort,
+            "--model", model,
+            "--print", full_prompt
+        ]
+
+        env = os.environ.copy()
+        home = os.path.expanduser("~")
+        env["PATH"] = f"{home}/.local/bin:{home}/.gemini/antigravity-cli/bin:{env.get('PATH', '')}"
+
         try:
-            # Run agy command
             process = subprocess.Popen(
-                agy_cmd,
+                cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 encoding="utf-8",
-                errors="replace"
+                errors="replace",
+                env=env
             )
             
-            stdout, stderr = process.communicate(timeout=45)
+            stdout, stderr = process.communicate(timeout=60)
             
             if process.returncode == 0 and stdout.strip():
-                response_text = stdout.strip()
+                raw_output = stdout.strip()
+                thoughts = ""
+                reply = raw_output
+
+                # Extract thoughts if model wrapped them in thought tags
+                if "<thought>" in raw_output and "</thought>" in raw_output:
+                    try:
+                        start_idx = raw_output.find("<thought>") + len("<thought>")
+                        end_idx = raw_output.find("</thought>")
+                        thoughts = raw_output[start_idx:end_idx].strip()
+                        reply = (raw_output[:raw_output.find("<thought>")] + raw_output[end_idx + len("</thought>"):]).strip()
+                    except Exception:
+                        pass
+                elif "Thinking Process:" in raw_output:
+                    parts = raw_output.split("Thinking Process:", 1)
+                    thoughts = parts[1].split("\n\n", 1)[0].strip()
+
                 self.add_message("user", user_text)
-                self.add_message("assistant", response_text)
-                return response_text
+                self.add_message("assistant", reply, thoughts)
+                return reply, thoughts
             else:
-                err_msg = stderr.strip() if stderr else "Неизвестная ошибка"
-                # Fallback to simulation mode if agy had an issue
-                return self._simulate_fallback(user_text, f"Agy error: {err_msg}")
-        except FileNotFoundError:
-            return self._simulate_fallback(user_text, "Agy CLI не найден в PATH. Запущен автономный демо-режим.")
+                err_msg = stderr.strip() if stderr else "Не удалось получить ответ от ядра модели."
+                err_reply = f"❌ Ошибка вызова модели ({model}):\n```\n{err_msg}\n```\nПопробуйте повторить запрос или сменить модель в боковой панели."
+                self.add_message("user", user_text)
+                self.add_message("assistant", err_reply)
+                return err_reply, ""
         except subprocess.TimeoutExpired:
             process.kill()
-            return f"{self.bot.get('emoji', '🤖')} [Таймаут]: Antigravity отвечал слишком долго. Попробуйте сформулировать вопрос короче."
+            err_reply = "⏱️ Таймаут: Модель размышляла слишком долго (более 60 секунд). Попробуйте сформулировать запрос компактнее."
+            self.add_message("user", user_text)
+            self.add_message("assistant", err_reply)
+            return err_reply, ""
         except Exception as e:
-            return self._simulate_fallback(user_text, str(e))
-
-    def _simulate_fallback(self, user_text: str, reason: str) -> str:
-        """Fallback response generator if Antigravity CLI is temporarily unavailable."""
-        emoji = self.bot.get("emoji", "🤖")
-        name = self.bot.get("name", "Бот")
-        archetype = self.bot.get("archetype", "grok_rebel")
-        
-        self.add_message("user", user_text)
-        
-        if "rebel" in archetype:
-            reply = (
-                f"{emoji} О, вижу твой запрос «{user_text}»! "
-                f"Я бы выдал сейчас квантовую дозу сарказма и гениальности, но Antigravity CLI дал сбой ({reason}). "
-                f"Тем не менее, суть ясна: не бойся ломать шаблоны и кодить красиво! 🏴‍☠️🔥"
-            )
-        elif "thinker" in archetype:
-            reply = (
-                f"{emoji} Анализируя предпосылку вопроса «{user_text}», я вижу фундаментальное противоречие. "
-                f"(Локальный движок переключен в безопасный режим: {reason}). "
-                f"Мысль — это первый шаг к архитектуре. 🧠💡"
-            )
-        elif "coder" in archetype:
-            reply = (
-                f"{emoji} Запрос принят: `{user_text}`.\n"
-                f"```bash\n# Рекомендация CyberCoder:\npython3 main.py --check-system\n```\n"
-                f"Код должен быть чистым, а зависимости — минимальными! 💻⚡"
-            )
-        else:
-            reply = f"{emoji} {name} на связи! Ответ на «{user_text}» принят в обработку. (Статус: {reason})"
-            
-        self.add_message("assistant", reply)
-        return reply
+            err_reply = f"❌ Системная ошибка выполнения: {str(e)}"
+            self.add_message("user", user_text)
+            self.add_message("assistant", err_reply)
+            return err_reply, ""
 
     def save_session_markdown(self) -> str:
         """Export current session history to a Markdown file."""
@@ -149,7 +314,7 @@ class ChatEngine:
         filepath = os.path.join(HISTORY_DIR, filename)
         
         lines = [
-            f"# Диалог с {self.bot.get('emoji', '')} {self.bot.get('name', 'Бот')}",
+            f"# Диалог с {self.bot.get('emoji', '')} {self.bot.get('name', 'Бот')} [Antigravity 2.0 Grok Edition]",
             f"- **Дата**: {time.strftime('%Y-%m-%d %H:%M:%S')}",
             f"- **Модель**: `{self.bot.get('model', 'gemini-3.8-flash-high')}`",
             f"- **Юмор**: {self.bot.get('humor_level', 50)}%",
@@ -166,6 +331,8 @@ class ChatEngine:
                 lines.append("")
             else:
                 lines.append(f"### {self.bot.get('emoji', '🤖')} {self.bot.get('name', 'Бот')} ({msg.get('time', '')})")
+                if msg.get("thoughts"):
+                    lines.append(f"> **💭 Размышления:**\n> {msg['thoughts']}\n")
                 lines.append(msg["content"])
                 lines.append("")
         

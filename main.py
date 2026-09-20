@@ -507,15 +507,25 @@ def screen_help() -> None:
     press_any_key()
 
 def main() -> None:
-    """Main CLI entry point with menu loop and flag parsing."""
-    init_terminal()
-    
-    parser = argparse.ArgumentParser(description="Antigravity Bot Hub - Grok-Style Multi-Bot Creator")
+    """Main entry point: launches Antigravity 2.0 Desktop Studio by default, or CLI if requested."""
+    parser = argparse.ArgumentParser(description="Antigravity 2.0 - Grok-Style Multi-Bot Studio")
+    parser.add_argument("--gui", action="store_true", help="Launch Antigravity 2.0 Desktop Studio (Default)")
+    parser.add_argument("--cli", action="store_true", help="Launch interactive Terminal TUI mode")
+    parser.add_argument("--port", type=int, default=0, help="Port for Desktop GUI server")
+    parser.add_argument("--no-window", action="store_true", help="Start GUI server without opening window")
     parser.add_argument("--bot", type=str, help="Launch chat directly with specified bot ID")
     parser.add_argument("--list", action="store_true", help="List all available bots and exit")
     parser.add_argument("--create", action="store_true", help="Launch create bot wizard directly")
     parser.add_argument("--export-all", action="store_true", help="Export all bots to .agents/rules/ and exit")
     args = parser.parse_args()
+
+    # If no flags or --gui is specified, launch Desktop GUI Studio
+    if not args.cli and not args.bot and not args.list and not args.create and not args.export_all:
+        from gui import start_gui
+        start_gui(port=args.port, open_window=not args.no_window)
+        sys.exit(0)
+
+    init_terminal()
     
     # Handle direct arguments
     if args.list:

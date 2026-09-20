@@ -29,12 +29,14 @@ jobs:
 
       - name: Build Standalone Binary with PyInstaller
         run: |
-          pyinstaller --clean -y --name agybots --onedir main.py
+          pyinstaller --clean -y --name agybots --onedir --add-data "web:web" --add-data "data:data" main.py
 
       - name: Prepare AppDir & AppImage
         run: |
           mkdir -p build/AppDir/usr/bin build/AppDir/usr/share/icons/hicolor/256x256/apps build/AppDir/usr/share/applications
           cp -r dist/agybots/* build/AppDir/usr/bin/
+          cp -r web build/AppDir/usr/bin/
+          cp -r data build/AppDir/usr/bin/
           cp agybots.png build/AppDir/usr/share/icons/hicolor/256x256/apps/
           cp agybots.png build/AppDir/agybots.png
           cp packaging/agybots.desktop build/AppDir/
@@ -71,7 +73,7 @@ jobs:
 
       - name: Build Windows Executable
         run: |
-          pyinstaller --clean -y --onefile --name AntigravityBotHub-Windows-x86_64.exe main.py
+          pyinstaller --clean -y --onefile --name AntigravityBotHub-Windows-x86_64.exe --add-data "web;web" --add-data "data;data" main.py
           copy dist\AntigravityBotHub-Windows-x86_64.exe dist\agybots.exe
 
       - name: Upload Windows Artifact
