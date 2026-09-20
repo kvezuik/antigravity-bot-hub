@@ -7,9 +7,9 @@ from typing import Dict, List, Any
 
 # Themed Emoji Packs
 EMOJI_PACKS = {
-    "grok_rebel": {
-        "title": "🏴‍☠️ Grok Rebel & Sarcasm",
-        "description": "Острые, дерзкие и бунтарские смайлики в духе Grok",
+    "cyber_rebel": {
+        "title": "🏴‍☠️ Cyber Rebel & Sarcasm",
+        "description": "Острые, дерзкие и живые символы",
         "emojis": ["🏴‍☠️", "🤪", "😈", "🔥", "🕶️", "🍿", "🗿", "🚀", "💣", "🦾", "👾", "🤡", "💀", "🌪️", "🌶️"]
     },
     "cyber_tech": {
@@ -40,14 +40,14 @@ EMOJI_PACKS = {
     "cyber_badges": {
         "title": "✦ Cyber Badges & ASCII",
         "description": "Текстовые и минималистичные техно-символы",
-        "emojis": ["[✦]", "[⚡]", "[⚔️]", "[★]", "[AI]", "[#]", "[//]", "<sys>", "(•_•)", "(¬_¬)", "⟦G⟧", "◈"]
+        "emojis": ["[✦]", "[⚡]", "[⚔️]", "[★]", "[AI]", "[#]", "[//]", "<sys>", "(•_•)", "(¬_¬)", "⟦✦⟧", "◈"]
     }
 }
 
 # Mood Presets: defines dynamic status emojis during conversation
 MOOD_PRESETS = {
-    "grok_wild": {
-        "name": "Grok Дикий Режим",
+    "cyber_dynamic": {
+        "name": "Динамический Режим",
         "idle": "🕶️",
         "thinking": "🌀",
         "typing": "🔥",
@@ -112,7 +112,7 @@ def format_avatar(emoji: str, name: str, style_key: str = "boxed") -> str:
     template = AVATAR_STYLES.get(style_key, AVATAR_STYLES["boxed"])
     return template.format(emoji=emoji, name=name)
 
-def get_default_moods(archetype: str = "grok_rebel") -> Dict[str, str]:
+def get_default_moods(archetype: str = "cyber_rebel") -> Dict[str, str]:
     """Return default mood set based on archetype."""
     if "thinker" in archetype.lower() or "mind" in archetype.lower():
         return dict(MOOD_PRESETS["deep_thinker"])
@@ -123,4 +123,4 @@ def get_default_moods(archetype: str = "grok_rebel") -> Dict[str, str]:
     elif "devops" in archetype.lower() or "hunter" in archetype.lower():
         return dict(MOOD_PRESETS["system_sentinel"])
     else:
-        return dict(MOOD_PRESETS["grok_wild"])
+        return dict(MOOD_PRESETS["cyber_dynamic"])

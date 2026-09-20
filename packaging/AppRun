@@ -2,4 +2,8 @@
 HERE="$(dirname "$(readlink -f "${0}")")"
 export PATH="${HERE}/usr/bin:${HOME}/.local/bin:${HOME}/.gemini/antigravity-cli/bin:/usr/local/bin:/usr/bin:${PATH}"
 export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/usr/bin:${LD_LIBRARY_PATH}"
+export PYTHONPATH="${HOME}/.local/lib/python3.14/site-packages:${HERE}/usr/bin:${PYTHONPATH}"
+if [ -n "$WAYLAND_DISPLAY" ]; then
+    export QT_QPA_PLATFORM="wayland;xcb"
+fi
 exec "${HERE}/usr/bin/agybots" "$@"

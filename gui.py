@@ -254,10 +254,17 @@ def find_free_port(preferred: int = 8990) -> int:
         return port
 
 
-def open_desktop_window(url: str) -> None:
-    """Launch clean, dedicated application window without browser toolbar."""
+def open_desktop_window(url: str, on_close: Optional[Callable[[], None]] = None) -> bool:
+    """Launch clean, dedicated native application window (PyQt6 / pywebview with browser fallback)."""
+    try:
+        from app_window import run_native_desktop_app
+        if run_native_desktop_app(url, on_close=on_close):
+            return True
+    except Exception as e:
+        print(f"[Desktop] Native window error: {e}")
+
+    # Fallback to browser app mode if native GUI toolkit is unavailable
     temp_profile = "/tmp/antigravity_desktop_profile"
-    
     candidates = [
         "chromium",
         "google-chrome",
@@ -282,18 +289,19 @@ def open_desktop_window(url: str) -> None:
                     "--no-default-browser-check"
                 ]
                 subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                return
+                return False
             except Exception:
                 pass
 
     if sys.platform == "win32":
         try:
             os.system(f'start msedge --app="{url}"')
-            return
+            return False
         except Exception:
             pass
 
     webbrowser.open(url)
+    return False
 
 
 def start_gui(port: int = 0, open_window: bool = True) -> None:
@@ -306,17 +314,30 @@ def start_gui(port: int = 0, open_window: bool = True) -> None:
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
 
-    print(f"🚀 Antigravity 2.0 Desktop запущен на: {url}")
+    print(f"🚀 Antigravity 2.0 Desktop Studio запущен на: {url}")
+
+    def stop_server():
+        print("\nОстановка локального сервера...")
+        try:
+            server.shutdown()
+        except Exception:
+            pass
 
     if open_window:
-        open_desktop_window(url)
-
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\nОстановка сервера...")
-        server.shutdown()
+        is_native_event_loop = open_desktop_window(url, on_close=stop_server)
+        if not is_native_event_loop:
+            # If opened via external browser, keep main thread alive
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                stop_server()
+    else:
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            stop_server()
 
 
 if __name__ == "__main__":

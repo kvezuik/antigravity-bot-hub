@@ -7,4 +7,5 @@ Terminal=false
 Type=Application
 Categories=Development;Utility;Chat;
 Keywords=AI;Antigravity;Assistant;Studio;GUI;2.0;
+StartupWMClass=agybots
 

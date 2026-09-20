@@ -99,7 +99,7 @@ def pad_str(text: str, width: int, align: str = "left") -> str:
     else:
         return text + (" " * diff)
 
-def print_header(title: str = "ANTIGRAVITY BOT HUB", subtitle: str = "Генератор и Мастерская Grok-Ботов") -> None:
+def print_header(title: str = "ANTIGRAVITY BOT HUB", subtitle: str = "Агентная студия и среда Antigravity 2.0") -> None:
     """Print glowing cyber banner header."""
     init_terminal()
     width = 68
@@ -240,7 +240,7 @@ def select_menu_item(
 
     while True:
         clear_screen()
-        print_header("ANTIGRAVITY BOT HUB", "Генератор и Мастерская Grok-Ботов")
+        print_header("ANTIGRAVITY BOT HUB", "Агентная студия и среда Antigravity 2.0")
         
         # Render menu box
         print(f"{PURPLE}╭─ {BOLD}{WHITE}{header_title}{RESET}{PURPLE} {'─' * max(0, width - str_width(header_title) - 6)}╮{RESET}")

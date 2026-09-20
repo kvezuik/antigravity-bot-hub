@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Antigravity Bot Hub - Main Application
-Cross-platform Grok-style Bot Studio and Multi-Agent Manager for Antigravity.
+Cross-platform Desktop Studio and Multi-Agent Manager for Antigravity 2.0.
 Works seamlessly on Linux and Windows.
 """
 
@@ -42,12 +42,12 @@ AVAILABLE_MODELS = [
     ("gpt-oss-120b-medium", "GPT-OSS 120B - Открытая мощная модель")
 ]
 
-CURRENT_BOT_ID = "grok_fun"
+CURRENT_BOT_ID = "antigravity_assistant"
 
 def run_chat_session(bot: Dict[str, Any]) -> None:
     """Run interactive terminal chat with selected bot."""
     global CURRENT_BOT_ID
-    CURRENT_BOT_ID = bot.get("id", "grok_fun")
+    CURRENT_BOT_ID = bot.get("id", "antigravity_assistant")
     
     engine = ChatEngine(bot)
     moods = bot.get("moods", {})
@@ -193,7 +193,7 @@ def screen_emoji_customizer() -> None:
         print_header(f"КАСТОМИЗАЦИЯ СМАЙЛИКОВ: {bot.get('name')}", f"Текущий аватар: {avatar}")
         
         menu_items = [
-            ("1", "Выбрать из тематических наборов (Grok, Cyber, Mind...)", "Готовые коллекции крутых смайликов"),
+            ("1", "Выбрать из тематических наборов (Cyber, Mind, Creative...)", "Готовые коллекции крутых смайликов"),
             ("2", "Ввести свой смайлик вручную", "Любой Unicode эмодзи или текстовый тег [⚡], 💀, 👾"),
             ("3", "Настроить эмодзи статусов и настроения (Moods)", f"Ожидание: {bot.get('moods',{}).get('idle')} | Мысль: {bot.get('moods',{}).get('thinking')} | Ответ: {bot.get('moods',{}).get('typing')}"),
             ("4", "Выбрать стиль рамки аватара", f"Текущий стиль: {bot.get('avatar_style', 'boxed')}"),
@@ -265,7 +265,7 @@ def screen_create_wizard() -> None:
     """Interactive wizard to create a brand new custom bot for anything."""
     global CURRENT_BOT_ID
     clear_screen()
-    print_header("МАСТЕР СОЗДАНИЯ БОТА", "Создай собственного Grok-бота для любой задачи")
+    print_header("МАСТЕР СОЗДАНИЯ БОТА", "Создай собственного ИИ-агента для любой задачи")
     
     print(f"{WHITE}Шаг 1 из 6: Базовая информация{RESET}")
     name = prompt_text("Имя бота (напр. DevSecOps Бот, Английский Собеседник, Шеф-Повар)")
@@ -282,7 +282,7 @@ def screen_create_wizard() -> None:
     # Archetype selection
     print(f"\n{WHITE}Шаг 3 из 6: Характер и Архетип{RESET}")
     archetype_choices = [
-        ("grok_rebel", "Grok Rebel (Остроумный бунтарь, сарказм, юмор)", "Острые подколки, живой язык, честность"),
+        ("cyber_rebel", "Cyber Rebel (Остроумный и живой язык, честность)", "Острые подколки, живой язык, честность"),
         ("deep_thinker", "Deep Thinker (Философ и Архитектор мысли)", "Первые принципы, глубокая логика"),
         ("cyber_ninja", "Cyber Coder (Хакер и программист Antigravity)", "Чистый код, архитектура, скрипты"),
         ("roaster", "Brutal Roaster (Беспощадная прожарка)", "Юморная критика и профессиональное исправление"),
@@ -295,8 +295,8 @@ def screen_create_wizard() -> None:
     # System Prompt
     print(f"\n{WHITE}Шаг 4 из 6: Системная инструкция (System Prompt){RESET}")
     def_prompt = f"Ты — {name}, высококвалифицированный специалист в своей области. Отвечай качественно, интересно и по существу."
-    if chosen_arch == "grok_rebel":
-        def_prompt = f"Ты — {name}, остроумный и дерзкий ассистент в стиле Grok. Шути, используй сарказм, но выдавай безупречную пользу!"
+    if chosen_arch == "cyber_rebel":
+        def_prompt = f"Ты — {name}, остроумный и энергичный ассистент. Отвечай живо, сочно, умно, но по делу всегда давай точную и полезную суть!"
     elif chosen_arch == "deep_thinker":
         def_prompt = f"Ты — {name}, глубокий аналитик. Разбирай вопросы по первым принципам и помогай принимать системные решения."
     elif chosen_arch == "cyber_ninja":
@@ -309,7 +309,7 @@ def screen_create_wizard() -> None:
     
     # Humor Slider
     print(f"\n{WHITE}Шаг 5 из 6: Настройки поведения{RESET}")
-    humor = prompt_slider("Уровень юмора и сарказма", min_v=0, max_v=100, default=70 if chosen_arch in ("grok_rebel", "roaster") else 30)
+    humor = prompt_slider("Уровень юмора и сарказма", min_v=0, max_v=100, default=70 if chosen_arch in ("cyber_rebel", "roaster") else 30)
     
     # Model Selection
     print(f"\n{WHITE}Шаг 6 из 6: Выбор модели Antigravity{RESET}")
@@ -486,16 +486,16 @@ def screen_history() -> None:
 def screen_help() -> None:
     """Show help and information."""
     clear_screen()
-    print_header("СПРАВКА И ВОЗМОЖНОСТИ", "Antigravity Bot Hub (Grok Edition)")
+    print_header("СПРАВКА И ВОЗМОЖНОСТИ", "Antigravity 2.0 Desktop Studio")
     
     help_text = [
         f"{BOLD}{WHITE}О проекте:{RESET}",
-        "Antigravity Bot Hub — это студия создания и управления кастомными",
-        "ИИ-ботами в духе Grok для Antigravity CLI.",
+        "Antigravity Bot Hub — это десктопная студия и среда управления проектами",
+        "и диалогами для Antigravity 2.0 CLI.",
         "",
         f"{BOLD}{WHITE}Ключевые фичи:{RESET}",
-        f"• {CYAN}Любые роли:{RESET} от бунтаря-сатирика Grok до детектора багов и ментора",
-        f"• {PINK}Кастомизация смайликов:{RESET} готовые паки (Grok, Cyber, Mind) + свои эмодзи",
+        f"• {CYAN}Любые роли:{RESET} от системного архитектора до детектора багов и ментора",
+        f"• {PINK}Кастомизация смайликов:{RESET} готовые паки (Cyber, Mind, Systems) + свои символы",
         f"• {YELLOW}Кроссплатформенность:{RESET} красивый интерфейс для Linux и Windows",
         f"• {GREEN}Интеграция с Antigravity:{RESET} прямой запуск через agy и экспорт в .agents/rules",
         "",

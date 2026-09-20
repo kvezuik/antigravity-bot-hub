@@ -1,6 +1,6 @@
 /* =========================================================
    Antigravity 2.0 • Desktop Studio Design System
-   Enhanced with Magic UI Effects & Sleek Grok-Style Vector Aesthetics
+   Enhanced with Magic UI Effects & Sleek Geometric Vector Aesthetics
    ========================================================= */
 
 :root {
@@ -1087,7 +1087,7 @@ code {
   padding-right: 4px;
 }
 
-/* ================= MODALS & CUSTOM GROK-STYLE ICONS ================= */
+/* ================= MODALS & CUSTOM GEOMETRIC ICONS ================= */
 .modal-overlay {
   position: fixed;
   inset: 0;

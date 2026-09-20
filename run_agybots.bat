@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title Antigravity Bot Hub - Grok Edition
+title Antigravity 2.0 Desktop Studio
 echo Launching Antigravity Bot Hub...
 python main.py %*
 if %ERRORLEVEL% NEQ 0 (
