@@ -228,6 +228,15 @@ class AntigravityGUIHandler(SimpleHTTPRequestHandler):
             })
             return
 
+        elif path == "/api/open-external":
+            ext_url = data.get("url", "").strip()
+            if ext_url and (ext_url.startswith("http://") or ext_url.startswith("https://")):
+                open_in_default_browser(ext_url)
+                self._send_json({"ok": True, "opened": ext_url})
+            else:
+                self._send_json({"error": "invalid_url"}, status=400)
+            return
+
         self._send_json({"error": "not_found"}, status=404)
 
     def _send_json(self, data: Any, status: int = 200):
@@ -254,8 +263,29 @@ def find_free_port(preferred: int = 8990) -> int:
         return port
 
 
+def open_in_default_browser(url: str) -> None:
+    """Open URL strictly in the user's default system browser. Never force Edge or open borderless window."""
+    try:
+        if sys.platform == "win32":
+            # On Windows, 'start "" "url"' opens the system DEFAULT browser (Chrome, Firefox, Opera, etc.)
+            # Never hardcode 'start msedge'
+            os.system(f'start "" "{url}"')
+            return
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", url])
+            return
+        else:
+            if shutil.which("xdg-open"):
+                subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return
+    except Exception as e:
+        print(f"Error opening system browser: {e}")
+
+    webbrowser.open(url)
+
+
 def open_desktop_window(url: str, on_close: Optional[Callable[[], None]] = None) -> bool:
-    """Launch clean, dedicated native application window (PyQt6 / pywebview with browser fallback)."""
+    """Launch clean, dedicated native application window (PyQt6 / pywebview with clean fallback)."""
     try:
         from app_window import run_native_desktop_app
         if run_native_desktop_app(url, on_close=on_close):
@@ -263,44 +293,8 @@ def open_desktop_window(url: str, on_close: Optional[Callable[[], None]] = None)
     except Exception as e:
         print(f"[Desktop] Native window error: {e}")
 
-    # Fallback to browser app mode if native GUI toolkit is unavailable
-    temp_profile = "/tmp/antigravity_desktop_profile"
-    candidates = [
-        "chromium",
-        "google-chrome",
-        "google-chrome-stable",
-        "brave-browser",
-        "brave",
-        "microsoft-edge",
-        "msedge"
-    ]
-    
-    for browser in candidates:
-        browser_bin = shutil.which(browser)
-        if browser_bin:
-            try:
-                cmd = [
-                    browser_bin,
-                    f"--app={url}",
-                    "--class=AntigravityDesktop",
-                    "--name=Antigravity 2.0",
-                    f"--user-data-dir={temp_profile}",
-                    "--no-first-run",
-                    "--no-default-browser-check"
-                ]
-                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                return False
-            except Exception:
-                pass
-
-    if sys.platform == "win32":
-        try:
-            os.system(f'start msedge --app="{url}"')
-            return False
-        except Exception:
-            pass
-
-    webbrowser.open(url)
+    # Fallback: open in default system browser
+    open_in_default_browser(url)
     return False
 
 

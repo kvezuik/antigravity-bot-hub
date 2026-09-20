@@ -1,8 +1,9 @@
 #!/bin/sh
 HERE="$(dirname "$(readlink -f "${0}")")"
 export PATH="${HERE}/usr/bin:${HOME}/.local/bin:${HOME}/.gemini/antigravity-cli/bin:/usr/local/bin:/usr/bin:${PATH}"
-export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/usr/bin:${LD_LIBRARY_PATH}"
-export PYTHONPATH="${HOME}/.local/lib/python3.14/site-packages:${HERE}/usr/bin:${PYTHONPATH}"
+export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/usr/bin:${HERE}/usr/bin/_internal:${HERE}/usr/bin/_internal/PyQt6/Qt6/lib:${LD_LIBRARY_PATH}"
+export QT_PLUGIN_PATH="${HERE}/usr/bin/_internal/PyQt6/Qt6/plugins"
+export QML2_IMPORT_PATH="${HERE}/usr/bin/_internal/PyQt6/Qt6/qml"
 if [ -n "$WAYLAND_DISPLAY" ]; then
     export QT_QPA_PLATFORM="wayland;xcb"
 fi

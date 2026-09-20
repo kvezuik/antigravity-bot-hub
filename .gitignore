@@ -1,25 +1,24 @@
-# Python cache
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
 
-# Distribution / Packaging
+*$py.class
+AntigravityBotHub-Linux-x86_64.AppImage
+*.AppImage
+*.bak
 build/
 dist/
-release-*/
-*.spec
-*.pyz
-AntigravityBotHub-Linux-x86_64.AppImage
-
-# Local user history and data
-history/*.md
-!history/.gitkeep
-
-# IDE & OS
-.vscode/
-.idea/
+# Distribution / Packaging
 .DS_Store
+!history/.gitkeep
+history/*.md
+.idea/
+# IDE & OS
+# Local user history and data
+__pycache__/
+*.py[cod]
+.Python
+# Python cache
+*.pyz
+release-*/
+*.so
+*.spec
 *.swp
-*.bak
+.vscode/

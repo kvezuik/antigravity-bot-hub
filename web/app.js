@@ -53,6 +53,16 @@ async function checkAuthStatus(forceRefresh = false) {
   }
 }
 
+function openExternalUrl(url) {
+  fetch('/api/open-external', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url })
+  }).catch(() => {
+    window.open(url, '_blank');
+  });
+}
+
 function showAuthModal(data) {
   const modal = document.getElementById('auth-modal');
   const body = document.getElementById('auth-modal-body');
@@ -65,11 +75,11 @@ function showAuthModal(data) {
         Для работы ядра Antigravity 2.0 необходим аккаунт Google с активной подпиской.
       </div>
       <p style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;">
-        Нажмите кнопку ниже, чтобы открыть официальную страницу входа в Google Аккаунт.
+        Нажмите кнопку ниже, чтобы открыть официальную страницу входа в Google Аккаунт в вашем основном браузере.
       </p>
     `;
     actionBtn.textContent = 'Войти через Google';
-    actionBtn.onclick = () => window.open(data.login_url || 'https://accounts.google.com/o/oauth2/auth', '_blank');
+    actionBtn.onclick = () => openExternalUrl(data.login_url || 'https://accounts.google.com/o/oauth2/auth');
   } else if (data.subscription === 'none') {
     body.innerHTML = `
       <div class="alert-banner error">
@@ -78,11 +88,11 @@ function showAuthModal(data) {
       </div>
       <p style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;">
         Использование моделей заблокировано до активации подписки.<br>
-        Оформить подписку можно в панели Google One / Antigravity.
+        Оформить подписку можно в панели Google One / Antigravity в вашем основном браузере.
       </p>
     `;
     actionBtn.textContent = 'Оформить подписку';
-    actionBtn.onclick = () => window.open('https://one.google.com/explore-plan/gemini-advanced', '_blank');
+    actionBtn.onclick = () => openExternalUrl('https://one.google.com/explore-plan/gemini-advanced');
   } else {
     body.innerHTML = `
       <div class="alert-banner success">
@@ -108,6 +118,15 @@ function openAuthModal() {
 function closeAuthModal() {
   document.getElementById('auth-modal').style.display = 'none';
 }
+
+// Native Desktop Experience: disable web browser context menu on UI elements
+document.addEventListener('contextmenu', (e) => {
+  const target = e.target;
+  if (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.isContentEditable) {
+    return; // Allow native copy/paste on input fields
+  }
+  e.preventDefault();
+});
 
 // ================= PROJECTS MANAGEMENT =================
 

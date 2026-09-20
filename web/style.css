@@ -48,6 +48,24 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+/* NATIVE DESKTOP SCROLLBARS */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
 }
 
 body {
@@ -57,6 +75,18 @@ body {
   height: 100vh;
   overflow: hidden;
   display: flex;
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: none;
+}
+
+button:focus, select:focus {
+  outline: none;
+}
+
+.text-content, .thought-body, code, pre, .form-input, .chat-textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* ================= MAGIC UI: RETRO GRID & SPOTLIGHT ================= */
