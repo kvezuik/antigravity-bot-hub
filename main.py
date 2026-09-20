@@ -508,7 +508,7 @@ def screen_help() -> None:
 
 def main() -> None:
     """Main entry point: launches Antigravity 2.0 Desktop Studio by default, or CLI if requested."""
-    parser = argparse.ArgumentParser(description="Antigravity 2.0 - Grok-Style Multi-Bot Studio")
+    parser = argparse.ArgumentParser(description="Antigravity 2.0 - Desktop Studio & AI Projects")
     parser.add_argument("--gui", action="store_true", help="Launch Antigravity 2.0 Desktop Studio (Default)")
     parser.add_argument("--cli", action="store_true", help="Launch interactive Terminal TUI mode")
     parser.add_argument("--port", type=int, default=0, help="Port for Desktop GUI server")

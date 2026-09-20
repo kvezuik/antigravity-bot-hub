@@ -14,9 +14,9 @@
       <!-- Top Brand Header -->
       <div class="sidebar-header">
         <div class="brand">
-          <div class="brand-orb"></div>
+          <div class="brand-orb">✦</div>
           <div>
-            <div class="brand-title">Antigravity <span class="badge-version">2.0</span></div>
+            <div class="brand-title"><span class="shimmer-text">Antigravity</span> <span class="badge-version">2.0</span></div>
             <div class="brand-sub">DESKTOP STUDIO</div>
           </div>
         </div>
@@ -31,6 +31,7 @@
             <span class="proj-name" id="current-proj-name">Основной проект</span>
             <span class="dropdown-chevron">▾</span>
           </button>
+          <button class="btn-icon-action" onclick="openEditProjectModal()" title="Настройки текущего проекта">✏️</button>
           <button class="btn-icon-action" onclick="openNewProjectModal()" title="Создать новый проект">＋</button>
         </div>
 
@@ -46,10 +47,12 @@
         </div>
       </div>
 
-      <!-- New Chat Button -->
-      <button class="btn btn-primary btn-new-chat" onclick="openNewChatModal()">
-        <span class="icon">＋</span> Новый диалог
-      </button>
+      <!-- New Chat Button (Magic UI Shimmer Button) -->
+      <div class="shimmer-btn-wrapper">
+        <button class="btn btn-primary btn-new-chat" onclick="openNewChatModal()">
+          <span class="icon">＋</span> Новый диалог
+        </button>
+      </div>
 
       <!-- Individual Chats List -->
       <div class="chats-section">
@@ -130,9 +133,12 @@
         <!-- Messages appended here -->
       </div>
 
-      <!-- Thinking Animation Indicator -->
+      <!-- Thinking Animation Indicator (Magic UI Radar) -->
       <div class="thinking-indicator" id="thinking-indicator" style="display: none;">
-        <div class="thinking-spinner"></div>
+        <div class="thinking-radar">
+          <div class="radar-dot"></div>
+          <div class="radar-wave"></div>
+        </div>
         <span class="thinking-text" id="thinking-text">Antigravity 2.0 размышляет над ответом...</span>
       </div>
 
@@ -174,26 +180,46 @@
         <button class="btn-close" onclick="closeProjectModal()">✕</button>
       </div>
       <div class="modal-body">
-        <label class="form-label">Иконка проекта:</label>
-        <div class="emoji-picker-row">
-          <input type="text" id="project-icon-input" class="form-input emoji-input" value="📁" maxlength="4">
-          <div class="emoji-suggestions">
-            <span onclick="setProjectEmoji('📁')">📁</span>
-            <span onclick="setProjectEmoji('💻')">💻</span>
-            <span onclick="setProjectEmoji('🚀')">🚀</span>
-            <span onclick="setProjectEmoji('⚡')">⚡</span>
-            <span onclick="setProjectEmoji('📦')">📦</span>
-            <span onclick="setProjectEmoji('🧠')">🧠</span>
-            <span onclick="setProjectEmoji('🌐')">🌐</span>
-          </div>
+        <label class="form-label">ИКОНКА ПРОЕКТА:</label>
+        <div class="icon-picker-row">
+          <div class="icon-preview-badge" id="project-icon-preview">📁</div>
+          <input type="text" id="project-icon-input" class="form-input icon-input" value="📁" maxlength="8" placeholder="Символ или эмодзи" oninput="onCustomIconInput('project', this.value)">
+        </div>
+        <div class="icon-grid" id="project-icon-grid">
+          <!-- 24 Modern Geometric & Minimal Icons -->
+          <div class="icon-chip" onclick="selectIcon('project', '✦', this)">✦</div>
+          <div class="icon-chip" onclick="selectIcon('project', '⬡', this)">⬡</div>
+          <div class="icon-chip" onclick="selectIcon('project', '⚡', this)">⚡</div>
+          <div class="icon-chip" onclick="selectIcon('project', '◈', this)">◈</div>
+          <div class="icon-chip" onclick="selectIcon('project', '◬', this)">◬</div>
+          <div class="icon-chip" onclick="selectIcon('project', '☵', this)">☵</div>
+          <div class="icon-chip" onclick="selectIcon('project', '⛊', this)">⛊</div>
+          <div class="icon-chip" onclick="selectIcon('project', '⌘', this)">⌘</div>
+          <div class="icon-chip" onclick="selectIcon('project', '❖', this)">❖</div>
+          <div class="icon-chip" onclick="selectIcon('project', '▲', this)">▲</div>
+          <div class="icon-chip" onclick="selectIcon('project', '●', this)">●</div>
+          <div class="icon-chip" onclick="selectIcon('project', '■', this)">■</div>
+          <div class="icon-chip" onclick="selectIcon('project', '⬢', this)">⬢</div>
+          <div class="icon-chip" onclick="selectIcon('project', '⊞', this)">⊞</div>
+          <div class="icon-chip" onclick="selectIcon('project', '∿', this)">∿</div>
+          <div class="icon-chip" onclick="selectIcon('project', '∞', this)">∞</div>
+          <div class="icon-chip" onclick="selectIcon('project', '📁', this)">📁</div>
+          <div class="icon-chip" onclick="selectIcon('project', '💻', this)">💻</div>
+          <div class="icon-chip" onclick="selectIcon('project', '🚀', this)">🚀</div>
+          <div class="icon-chip" onclick="selectIcon('project', '💬', this)">💬</div>
+          <div class="icon-chip" onclick="selectIcon('project', '🎯', this)">🎯</div>
+          <div class="icon-chip" onclick="selectIcon('project', '🧠', this)">🧠</div>
+          <div class="icon-chip" onclick="selectIcon('project', '🔍', this)">🔍</div>
+          <div class="icon-chip" onclick="selectIcon('project', '🛡️', this)">🛡️</div>
         </div>
 
-        <label class="form-label">Название проекта:</label>
-        <input type="text" id="project-name-input" class="form-input" placeholder="Например: Мой Веб-Сервис">
+        <label class="form-label" style="margin-top: 8px;">НАЗВАНИЕ ПРОЕКТА:</label>
+        <input type="text" id="project-name-input" class="form-input" placeholder="Например: Архитектура бекенда">
       </div>
       <div class="modal-footer">
+        <button class="btn btn-ghost" id="project-delete-btn" onclick="deleteCurrentProject()" style="display: none; color: var(--accent-rose); margin-right: auto;">Удалить</button>
         <button class="btn btn-ghost" onclick="closeProjectModal()">Отмена</button>
-        <button class="btn btn-primary" onclick="submitProject()">Сохранить</button>
+        <button class="btn btn-primary" onclick="submitProjectModal()">Сохранить</button>
       </div>
     </div>
   </div>
@@ -206,21 +232,40 @@
         <button class="btn-close" onclick="closeChatModal()">✕</button>
       </div>
       <div class="modal-body">
-        <label class="form-label">Иконка диалога:</label>
-        <div class="emoji-picker-row">
-          <input type="text" id="chat-icon-input" class="form-input emoji-input" value="💬" maxlength="4">
-          <div class="emoji-suggestions">
-            <span onclick="setChatEmoji('💬')">💬</span>
-            <span onclick="setChatEmoji('⚡')">⚡</span>
-            <span onclick="setChatEmoji('🛠️')">🛠️</span>
-            <span onclick="setChatEmoji('💻')">💻</span>
-            <span onclick="setChatEmoji('🔍')">🔍</span>
-            <span onclick="setChatEmoji('📝')">📝</span>
-            <span onclick="setChatEmoji('🎯')">🎯</span>
-          </div>
+        <label class="form-label">ИКОНКА ДИАЛОГА:</label>
+        <div class="icon-picker-row">
+          <div class="icon-preview-badge" id="chat-icon-preview">💬</div>
+          <input type="text" id="chat-icon-input" class="form-input icon-input" value="💬" maxlength="8" placeholder="Символ или эмодзи" oninput="onCustomIconInput('chat', this.value)">
+        </div>
+        <div class="icon-grid" id="chat-icon-grid">
+          <!-- 24 Modern Geometric & Minimal Icons -->
+          <div class="icon-chip" onclick="selectIcon('chat', '✦', this)">✦</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '⬡', this)">⬡</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '⚡', this)">⚡</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '◈', this)">◈</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '◬', this)">◬</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '☵', this)">☵</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '⛊', this)">⛊</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '⌘', this)">⌘</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '❖', this)">❖</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '▲', this)">▲</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '●', this)">●</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '■', this)">■</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '⬢', this)">⬢</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '⊞', this)">⊞</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '∿', this)">∿</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '∞', this)">∞</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '💬', this)">💬</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '💻', this)">💻</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '🚀', this)">🚀</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '📁', this)">📁</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '🎯', this)">🎯</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '🧠', this)">🧠</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '🔍', this)">🔍</div>
+          <div class="icon-chip" onclick="selectIcon('chat', '🛡️', this)">🛡️</div>
         </div>
 
-        <label class="form-label">Название диалога:</label>
+        <label class="form-label" style="margin-top: 8px;">НАЗВАНИЕ ДИАЛОГА:</label>
         <input type="text" id="chat-name-input" class="form-input" placeholder="Например: Рефакторинг базы данных">
       </div>
       <div class="modal-footer">

@@ -8,6 +8,7 @@ let currentEffort = 'high';
 let isGenerating = false;
 let authStatus = { authenticated: false, email: null, subscription: 'none' };
 let editingChatId = null;
+let editingProjectId = null;
 
 // Initialize on DOM load
 document.addEventListener('DOMContentLoaded', async () => {
@@ -179,23 +180,105 @@ async function selectProject(pid) {
   }
 }
 
+function selectIcon(target, icon, chipEl) {
+  const input = document.getElementById(`${target}-icon-input`);
+  const preview = document.getElementById(`${target}-icon-preview`);
+  if (input) input.value = icon;
+  if (preview) preview.textContent = icon;
+
+  const grid = document.getElementById(`${target}-icon-grid`);
+  if (grid) {
+    grid.querySelectorAll('.icon-chip').forEach(c => c.classList.remove('selected'));
+  }
+  if (chipEl) chipEl.classList.add('selected');
+}
+
+function onCustomIconInput(target, val) {
+  const preview = document.getElementById(`${target}-icon-preview`);
+  const fallback = target === 'project' ? '📁' : '💬';
+  const glyph = val.trim() || fallback;
+  if (preview) preview.textContent = glyph;
+
+  const grid = document.getElementById(`${target}-icon-grid`);
+  if (grid) {
+    grid.querySelectorAll('.icon-chip').forEach(chip => {
+      chip.classList.toggle('selected', chip.textContent.trim() === glyph);
+    });
+  }
+}
+
+function highlightIconInGrid(target, icon) {
+  const preview = document.getElementById(`${target}-icon-preview`);
+  if (preview) preview.textContent = icon;
+  const input = document.getElementById(`${target}-icon-input`);
+  if (input) input.value = icon;
+
+  const grid = document.getElementById(`${target}-icon-grid`);
+  if (grid) {
+    grid.querySelectorAll('.icon-chip').forEach(chip => {
+      chip.classList.toggle('selected', chip.textContent.trim() === icon);
+    });
+  }
+}
+
 function openNewProjectModal() {
+  editingProjectId = null;
   document.getElementById('project-dropdown-menu').style.display = 'none';
+  document.getElementById('project-modal-title').textContent = '📁 Новый проект';
   document.getElementById('project-name-input').value = '';
-  document.getElementById('project-icon-input').value = '📁';
+  document.getElementById('project-delete-btn').style.display = 'none';
+  highlightIconInGrid('project', '📁');
+  document.getElementById('project-modal').style.display = 'flex';
+  document.getElementById('project-name-input').focus();
+}
+
+function openEditProjectModal() {
+  document.getElementById('project-dropdown-menu').style.display = 'none';
+  const curr = projects.find(p => p.id === currentProjectId) || projects[0];
+  if (!curr) return;
+  editingProjectId = curr.id;
+  document.getElementById('project-modal-title').textContent = '✏️ Настройки проекта';
+  document.getElementById('project-name-input').value = curr.name || '';
+  const icon = curr.icon || '📁';
+  highlightIconInGrid('project', icon);
+
+  const delBtn = document.getElementById('project-delete-btn');
+  delBtn.style.display = projects.length > 1 ? 'block' : 'none';
+
   document.getElementById('project-modal').style.display = 'flex';
   document.getElementById('project-name-input').focus();
 }
 
 function closeProjectModal() {
   document.getElementById('project-modal').style.display = 'none';
+  editingProjectId = null;
 }
 
-function setProjectEmoji(emoji) {
-  document.getElementById('project-icon-input').value = emoji;
+async function deleteCurrentProject() {
+  if (!editingProjectId) return;
+  const proj = projects.find(p => p.id === editingProjectId);
+  const name = proj ? proj.name : 'этот проект';
+  if (!confirm(`Удалить проект «${name}» и все связанные с ним диалоги?`)) return;
+
+  try {
+    const res = await fetch('/api/projects/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: editingProjectId })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      closeProjectModal();
+      await loadProjects();
+    } else {
+      alert('Нельзя удалить единственный проект.');
+    }
+  } catch (err) {
+    alert('Ошибка при удалении проекта: ' + err.message);
+  }
 }
 
-async function submitProject() {
+async function submitProjectModal() {
   const name = document.getElementById('project-name-input').value.trim();
   const icon = document.getElementById('project-icon-input').value.trim() || '📁';
 
@@ -205,17 +288,27 @@ async function submitProject() {
   }
 
   try {
-    const res = await fetch('/api/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, icon })
-    });
-    const newProj = await res.json();
-    closeProjectModal();
-    await loadProjects();
-    await selectProject(newProj.id);
+    if (editingProjectId) {
+      await fetch('/api/projects/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingProjectId, name, icon })
+      });
+      closeProjectModal();
+      await loadProjects();
+    } else {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, icon })
+      });
+      const newProj = await res.json();
+      closeProjectModal();
+      await loadProjects();
+      await selectProject(newProj.id);
+    }
   } catch (err) {
-    alert('Ошибка при создании проекта: ' + err.message);
+    alert('Ошибка при сохранении проекта: ' + err.message);
   }
 }
 
@@ -331,7 +424,7 @@ function openNewChatModal() {
   editingChatId = null;
   document.getElementById('chat-modal-title').textContent = '💬 Новый диалог';
   document.getElementById('chat-name-input').value = '';
-  document.getElementById('chat-icon-input').value = '💬';
+  highlightIconInGrid('chat', '💬');
   document.getElementById('chat-modal').style.display = 'flex';
   document.getElementById('chat-name-input').focus();
 }
@@ -341,7 +434,8 @@ function openEditChatModal(chatId = null) {
   const chat = currentChat;
   document.getElementById('chat-modal-title').textContent = '✏️ Редактирование диалога';
   document.getElementById('chat-name-input').value = (chat && chat.name) ? chat.name : '';
-  document.getElementById('chat-icon-input').value = (chat && chat.icon) ? chat.icon : '💬';
+  const icon = (chat && chat.icon) ? chat.icon : '💬';
+  highlightIconInGrid('chat', icon);
   document.getElementById('chat-modal').style.display = 'flex';
   document.getElementById('chat-name-input').focus();
 }
@@ -349,10 +443,6 @@ function openEditChatModal(chatId = null) {
 function closeChatModal() {
   document.getElementById('chat-modal').style.display = 'none';
   editingChatId = null;
-}
-
-function setChatEmoji(emoji) {
-  document.getElementById('chat-icon-input').value = emoji;
 }
 
 async function submitChatModal() {
