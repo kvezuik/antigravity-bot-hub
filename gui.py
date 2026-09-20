@@ -267,8 +267,10 @@ def open_in_default_browser(url: str) -> None:
     """Open URL strictly in the user's default system browser. Never force Edge or open borderless window."""
     try:
         if sys.platform == "win32":
-            # On Windows, 'start "" "url"' opens the system DEFAULT browser (Chrome, Firefox, Opera, etc.)
-            # Never hardcode 'start msedge'
+            # On Windows, os.startfile uses Win32 ShellExecute directly (no cmd.exe escaping issues)
+            if hasattr(os, "startfile"):
+                os.startfile(url)
+                return
             os.system(f'start "" "{url}"')
             return
         elif sys.platform == "darwin":
@@ -281,7 +283,10 @@ def open_in_default_browser(url: str) -> None:
     except Exception as e:
         print(f"Error opening system browser: {e}")
 
-    webbrowser.open(url)
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
 
 
 def open_desktop_window(url: str, on_close: Optional[Callable[[], None]] = None) -> bool:

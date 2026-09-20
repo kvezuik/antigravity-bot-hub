@@ -6,6 +6,8 @@ Uses PyQt6 WebEngine with clean native window chrome, dark obsidian palette, and
 
 import sys
 import os
+import shutil
+import subprocess
 import webbrowser
 from typing import Optional, Callable
 
@@ -14,23 +16,65 @@ ICON_PNG = os.path.join(BASE_DIR, "agybots.png")
 if not os.path.exists(ICON_PNG):
     ICON_PNG = os.path.join(BASE_DIR, "web", "icon.png")
 
+ICON_ICO = os.path.join(BASE_DIR, "agybots.ico")
+if not os.path.exists(ICON_ICO):
+    ICON_ICO = os.path.join(BASE_DIR, "web", "favicon.ico")
+
+
+def open_in_default_browser(url: str) -> None:
+    """Open URL strictly in the user's default system browser. Never force Edge."""
+    try:
+        if sys.platform == "win32":
+            # On Windows, os.startfile uses Win32 ShellExecute directly
+            if hasattr(os, "startfile"):
+                os.startfile(url)
+                return
+            os.system(f'start "" "{url}"')
+            return
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", url])
+            return
+        else:
+            if shutil.which("xdg-open"):
+                subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return
+    except Exception as e:
+        print(f"[Desktop] Error opening default browser: {e}")
+
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
+
 
 def run_native_desktop_app(url: str, on_close: Optional[Callable[[], None]] = None) -> bool:
     """
     Launch native desktop application window.
-    Returns True if successfully launched via a native GUI toolkit, False otherwise.
+    On Windows: uses native Microsoft WebView2 via pywebview (lightweight, native Windows 11/10 window).
+    On Linux/macOS: uses PyQt6 with QtWebEngine (native Wayland/X11 window).
     """
-    # Prefer PyQt6 for a 100% native desktop application experience
-    try:
-        return _run_pyqt6_app(url, on_close)
-    except Exception as e:
-        print(f"[Native App] PyQt6 launch failed: {e}. Trying fallback...")
+    if sys.platform == "win32":
+        # On Windows, prefer WebView2 (Evergreen native Windows runtime)
+        try:
+            return _run_pywebview_app(url, on_close)
+        except Exception as e:
+            print(f"[Native App] Windows pywebview failed: {e}. Trying PyQt6...")
 
-    # Secondary fallback: pywebview
-    try:
-        return _run_pywebview_app(url, on_close)
-    except Exception as e:
-        print(f"[Native App] pywebview launch failed: {e}")
+        try:
+            return _run_pyqt6_app(url, on_close)
+        except Exception as e:
+            print(f"[Native App] PyQt6 failed: {e}")
+    else:
+        # On Linux/macOS, prefer PyQt6
+        try:
+            return _run_pyqt6_app(url, on_close)
+        except Exception as e:
+            print(f"[Native App] PyQt6 launch failed: {e}. Trying pywebview...")
+
+        try:
+            return _run_pywebview_app(url, on_close)
+        except Exception as e:
+            print(f"[Native App] pywebview launch failed: {e}")
 
     return False
 
@@ -62,7 +106,7 @@ def _run_pyqt6_app(url: str, on_close: Optional[Callable[[], None]] = None) -> b
             if url_str.startswith("http://127.0.0.1") or url_str.startswith("http://localhost") or url_str.startswith("file://") or url_str == "about:blank":
                 return True
             # Open external links (e.g. Google OAuth, subscriptions, docs) in default browser
-            webbrowser.open(url_str)
+            open_in_default_browser(url_str)
             return False
 
     class AntigravityNativeWindow(QMainWindow):
@@ -224,7 +268,23 @@ def _run_pyqt6_app(url: str, on_close: Optional[Callable[[], None]] = None) -> b
 
 
 def _run_pywebview_app(url: str, on_close: Optional[Callable[[], None]] = None) -> bool:
+    # Ensure Lib/site-packages is on path if running in Windows portable environment
+    portable_site = os.path.join(BASE_DIR, "Lib", "site-packages")
+    if os.path.exists(portable_site) and portable_site not in sys.path:
+        sys.path.insert(0, portable_site)
+
     import webview
+
+    # Ensure external links open in system default browser (never force Edge)
+    try:
+        webbrowser.open = open_in_default_browser
+    except Exception:
+        pass
+
+    try:
+        webview.settings['OPEN_EXTERNAL_LINKS_IN_BROWSER'] = True
+    except Exception:
+        pass
 
     def on_closed():
         if on_close:
@@ -232,6 +292,8 @@ def _run_pywebview_app(url: str, on_close: Optional[Callable[[], None]] = None) 
                 on_close()
             except Exception:
                 pass
+
+    window_icon = ICON_ICO if (os.path.exists(ICON_ICO) and sys.platform == "win32") else (ICON_PNG if os.path.exists(ICON_PNG) else None)
 
     window = webview.create_window(
         title="Antigravity 2.0 • Desktop Studio",
@@ -242,6 +304,7 @@ def _run_pywebview_app(url: str, on_close: Optional[Callable[[], None]] = None) 
         background_color="#08090d"
     )
     window.events.closed += on_closed
-    print("🚀 [Native App] Запущено нативное окно Antigravity 2.0 (pywebview)")
-    webview.start(gui="qt" if "PyQt6" in sys.modules else None)
+    print("🚀 [Native App] Запущено нативное десктопное окно Antigravity 2.0 (WebView2 / pywebview)")
+    gui_engine = "edgechromium" if sys.platform == "win32" else ("qt" if "PyQt6" in sys.modules else None)
+    webview.start(gui=gui_engine, private_mode=False, icon=window_icon)
     return True
